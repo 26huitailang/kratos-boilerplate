@@ -15,6 +15,8 @@ func NewGRPCServer(c *conf.Server, greeter *service.GreeterService, logger log.L
 	var opts = []grpc.ServerOption{
 		grpc.Middleware(
 			recovery.Recovery(),
+			// 暂时注释掉操作日志中间件，等实现了 repo 后再启用
+			// middleware.OperationLogMiddleware(repo),
 		),
 	}
 	if c.Grpc.Network != "" {

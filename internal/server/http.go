@@ -1,6 +1,7 @@
 package server
 
 import (
+	authv1 "trae-demo/api/auth/v1"
 	v1 "trae-demo/api/helloworld/v1"
 	"trae-demo/internal/conf"
 	"trae-demo/internal/service"
@@ -11,10 +12,12 @@ import (
 )
 
 // NewHTTPServer new an HTTP server.
-func NewHTTPServer(c *conf.Server, greeter *service.GreeterService, logger log.Logger) *http.Server {
+func NewHTTPServer(c *conf.Server, greeter *service.GreeterService, auth *service.AuthService, logger log.Logger) *http.Server {
 	var opts = []http.ServerOption{
 		http.Middleware(
 			recovery.Recovery(),
+			// 暂时注释掉操作日志中间件，等实现了 repo 后再启用
+			// middleware.OperationLogMiddleware(repo),
 		),
 	}
 	if c.Http.Network != "" {
@@ -28,5 +31,6 @@ func NewHTTPServer(c *conf.Server, greeter *service.GreeterService, logger log.L
 	}
 	srv := http.NewServer(opts...)
 	v1.RegisterGreeterHTTPServer(srv, greeter)
+	authv1.RegisterAuthHTTPServer(srv, auth)
 	return srv
 }
