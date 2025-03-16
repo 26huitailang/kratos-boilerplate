@@ -36,3 +36,14 @@ bin/
 .vscode/
 .idea/
 *.swp
+
+# Generated files
+*.pb.go
+*.pb.validate.go
+openapi.yaml
+
+# IDE specific files
+.idea
+.vscode
+*.swp
+*.swo
