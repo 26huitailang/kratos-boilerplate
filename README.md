@@ -4,40 +4,61 @@
 ```
 go install github.com/go-kratos/kratos/cmd/kratos/v2@latest
 ```
-## Create a service
-```
-# Create a template project
-kratos new server
 
-cd server
-# Add a proto template
-kratos proto add api/server/server.proto
-# Generate the proto code
-kratos proto client api/server/server.proto
-# Generate the source code of service by proto file
-kratos proto server api/server/server.proto -t internal/service
-
-go generate ./...
-go build -o ./bin/ ./...
-./bin/server -conf ./configs
-```
-## Generate other auxiliary files by Makefile
-```
+## Project Setup
+1. Install dependencies and tools:
+```bash
 # Download and update dependencies
 make init
-# Generate API files (include: pb.go, http, grpc, validate, swagger) by proto file
-make api
-# Generate all files
-make all
 ```
-## Automated Initialization (wire)
-```
-# install wire
-go get github.com/google/wire/cmd/wire
 
-# generate wire
-cd cmd/server
-wire
+2. Generate API files:
+```bash
+# Generate API files (include: pb.go, http, grpc, validate, swagger)
+make api
+```
+
+3. Build and run:
+```bash
+# Build
+make build
+
+# Run
+./bin/trae-demo -conf ./configs
+```
+
+## Development
+
+### Prerequisites
+- Go 1.22+
+- Protocol Buffers v3
+- Docker (for running PostgreSQL)
+
+### Database Setup
+```bash
+# Start PostgreSQL
+docker compose up db -d
+```
+
+### Code Generation
+```bash
+# Generate all files (API, configs, etc.)
+make all
+
+# Generate API files only
+make api
+
+# Generate config only
+make config
+```
+
+### Build and Run
+```bash
+# Build
+make build
+
+# Run
+./bin/trae-demo -conf ./configs
 ```
 
 ## Docker
@@ -47,5 +68,11 @@ docker build -t <your-docker-image-name> .
 
 # run
 docker run --rm -p 8000:8000 -p 9000:9000 -v </path/to/your/configs>:/data/conf <your-docker-image-name>
+```
+
+## API Documentation
+After starting the service, you can access the Swagger UI at:
+```
+http://localhost:8000/q/swagger-ui/
 ```
 
