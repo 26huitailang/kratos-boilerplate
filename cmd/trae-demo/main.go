@@ -13,6 +13,7 @@ import (
 	"github.com/go-kratos/kratos/v2/middleware/tracing"
 	"github.com/go-kratos/kratos/v2/transport/grpc"
 	"github.com/go-kratos/kratos/v2/transport/http"
+	"github.com/go-kratos/swagger-api/openapiv2"
 
 	_ "go.uber.org/automaxprocs"
 )
@@ -34,6 +35,9 @@ func init() {
 }
 
 func newApp(logger log.Logger, gs *grpc.Server, hs *http.Server) *kratos.App {
+	openAPIHandler := openapiv2.NewHandler()
+	hs.HandlePrefix("/q/", openAPIHandler)
+
 	return kratos.New(
 		kratos.ID(id),
 		kratos.Name(Name),
