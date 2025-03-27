@@ -24,7 +24,7 @@ make api
 make build
 
 # Run
-./bin/trae-demo -conf ./configs
+./bin/xredline -conf ./configs
 ```
 
 ## Development
@@ -58,7 +58,7 @@ make config
 make build
 
 # Run
-./bin/trae-demo -conf ./configs
+./bin/xredline -conf ./configs
 ```
 
 ## Docker

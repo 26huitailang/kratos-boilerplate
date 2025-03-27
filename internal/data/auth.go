@@ -5,8 +5,8 @@ import (
 	"database/sql"
 	"time"
 
-	"trae-demo/internal/biz"
-	"trae-demo/internal/pkg/crypto"
+	"xredline/internal/biz"
+	"xredline/internal/pkg/crypto"
 
 	"github.com/go-kratos/kratos/v2/log"
 )

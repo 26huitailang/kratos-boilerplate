@@ -9,11 +9,11 @@ package main
 import (
 	"github.com/go-kratos/kratos/v2"
 	"github.com/go-kratos/kratos/v2/log"
-	"trae-demo/internal/biz"
-	"trae-demo/internal/conf"
-	"trae-demo/internal/data"
-	"trae-demo/internal/server"
-	"trae-demo/internal/service"
+	"xredline/internal/biz"
+	"xredline/internal/conf"
+	"xredline/internal/data"
+	"xredline/internal/server"
+	"xredline/internal/service"
 )
 
 import (

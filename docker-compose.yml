@@ -5,6 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    container_name: cross-redline-app
     ports:
       - "8000:8000"
       - "9000:9000"
@@ -15,9 +16,12 @@ services:
         condition: service_healthy
     environment:
       - TZ=Asia/Shanghai
+    networks:
+      - cross-redline-network
 
   db:
-    image: postgres:15-alpine
+    image: postgres:14
+    container_name: cross-redline-db
     restart: always
     environment:
       POSTGRES_USER: postgres
@@ -33,7 +37,13 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - cross-redline-network
 
 volumes:
   postgres_data:
     driver: local
+
+networks:
+  cross-redline-network:
+    driver: bridge

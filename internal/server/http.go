@@ -1,10 +1,10 @@
 package server
 
 import (
-	authv1 "trae-demo/api/auth/v1"
-	v1 "trae-demo/api/helloworld/v1"
-	"trae-demo/internal/conf"
-	"trae-demo/internal/service"
+	authv1 "xredline/api/auth/v1"
+	v1 "xredline/api/helloworld/v1"
+	"xredline/internal/conf"
+	"xredline/internal/service"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware/recovery"

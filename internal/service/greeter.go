@@ -3,8 +3,8 @@ package service
 import (
 	"context"
 
-	v1 "trae-demo/api/helloworld/v1"
-	"trae-demo/internal/biz"
+	v1 "xredline/api/helloworld/v1"
+	"xredline/internal/biz"
 )
 
 // GreeterService is a greeter service.

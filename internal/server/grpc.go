@@ -1,9 +1,9 @@
 package server
 
 import (
-	v1 "trae-demo/api/helloworld/v1"
-	"trae-demo/internal/conf"
-	"trae-demo/internal/service"
+	v1 "xredline/api/helloworld/v1"
+	"xredline/internal/conf"
+	"xredline/internal/service"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware/recovery"

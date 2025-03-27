@@ -3,8 +3,8 @@ package service
 import (
 	"context"
 
-	v1 "trae-demo/api/auth/v1"
-	"trae-demo/internal/biz"
+	v1 "xredline/api/auth/v1"
+	"xredline/internal/biz"
 
 	"github.com/go-kratos/kratos/v2/log"
 )
