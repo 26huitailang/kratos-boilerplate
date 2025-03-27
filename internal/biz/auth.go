@@ -12,22 +12,42 @@ import (
 )
 
 var (
-	ErrPasswordIncorrect = errors.New("password incorrect")
+	ErrUserNotFound      = errors.New("user not found")
 	ErrUserExists        = errors.New("user already exists")
+	ErrPasswordIncorrect = errors.New("password incorrect")
 )
 
+// User 用户模型
 type User struct {
 	ID        int64
 	Username  string
 	Password  string
+	Email     string
+	Phone     string
+	Name      string
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
 
+// UserInfo 用户信息（匿名化后的）
+type UserInfo struct {
+	ID        int64     `json:"id"`
+	Username  string    `json:"username"`
+	Email     string    `json:"email"` // 匿名化的邮箱
+	Phone     string    `json:"phone"` // 匿名化的手机号
+	Name      string    `json:"name"`  // 匿名化的姓名
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// UserRepo 用户仓储接口
 type UserRepo interface {
-	CreateUser(context.Context, *User) error
-	GetUser(context.Context, string) (*User, error)
-	GetUserByUsername(string) (*User, error)
+	CreateUser(ctx context.Context, user *User) error
+	GetUser(ctx context.Context, username string) (*User, error)
+	GetUserByEmail(ctx context.Context, email string) (*User, error)
+	GetUserByPhone(ctx context.Context, phone string) (*User, error)
+	GetUserByName(ctx context.Context, name string) (*User, error)
+	UpdateUser(ctx context.Context, user *User) error
 }
 
 type AuthUsecase struct {
@@ -61,7 +81,7 @@ func (uc *AuthUsecase) Register(ctx context.Context, username, password string) 
 
 func (uc *AuthUsecase) Login(ctx context.Context, username, password string) (string, error) {
 	// 1. 获取用户
-	user, err := uc.repo.GetUserByUsername(username)
+	user, err := uc.repo.GetUser(ctx, username)
 	if err != nil {
 		return "", fmt.Errorf("用户不存在: %v", err)
 	}
