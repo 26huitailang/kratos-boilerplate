@@ -62,6 +62,33 @@ all:
 	make config;
 	make generate;
 
+.PHONY: test
+# run all tests
+test:
+	go test -v -cover ./internal/...
+
+.PHONY: test-coverage
+# run tests and generate coverage report
+test-coverage:
+	go test -coverprofile=coverage.out ./internal/...
+
+.PHONY: test-coverage-html
+# run tests and generate html coverage report
+test-coverage-html: test-coverage
+	go tool cover -html=coverage.out -o coverage.html
+
+.PHONY: test-clean
+# clean test generated files
+test-clean:
+	rm -f coverage.out coverage.html
+
+.PHONY: test-all
+# regenerate all code and run tests
+test-all:
+	make api
+	make generate
+	make test
+
 # show help
 help:
 	@echo ''

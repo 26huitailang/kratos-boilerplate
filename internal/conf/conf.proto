@@ -8,6 +8,7 @@ import "google/protobuf/duration.proto";
 message Bootstrap {
   Server server = 1;
   Data data = 2;
+  Auth auth = 3;
 }
 
 message Server {
@@ -38,4 +39,15 @@ message Data {
   }
   Database database = 1;
   Redis redis = 2;
+}
+
+message Auth {
+  string jwt_secret_key = 1;
+  google.protobuf.Duration access_token_expiration = 2;
+  google.protobuf.Duration refresh_token_expiration = 3;
+  bool captcha_enabled = 4;
+  google.protobuf.Duration captcha_expiration = 5;
+  int32 max_login_attempts = 6;
+  google.protobuf.Duration lock_duration = 7;
+  bool totp_enabled = 8;
 }
