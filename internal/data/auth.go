@@ -3,6 +3,8 @@ package data
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"sync"
 	"time"
 
 	"xredline/internal/biz"
@@ -15,6 +17,18 @@ type userRepo struct {
 	data *Data
 	log  *log.Helper
 	enc  crypto.Encryptor
+
+	// 内存存储验证码和账户锁定信息（实际项目应使用Redis等缓存）
+	captchas      sync.Map // map[captchaID]*biz.Captcha
+	accountLocks  sync.Map // map[username]*biz.AccountLock
+	refreshTokens sync.Map // map[tokenID]struct{tokenUsername string, used bool}
+}
+
+// 刷新令牌信息
+type refreshTokenInfo struct {
+	username string
+	used     bool
+	expireAt time.Time
 }
 
 // NewUserRepo .
@@ -240,4 +254,128 @@ func (r *userRepo) UpdateUser(ctx context.Context, u *biz.User) error {
 		u.ID,
 	)
 	return err
+}
+
+// 验证码相关方法
+func (r *userRepo) SaveCaptcha(ctx context.Context, captcha *biz.Captcha) error {
+	r.captchas.Store(captcha.ID, captcha)
+	return nil
+}
+
+func (r *userRepo) GetCaptcha(ctx context.Context, captchaID string) (*biz.Captcha, error) {
+	value, ok := r.captchas.Load(captchaID)
+	if !ok {
+		return nil, fmt.Errorf("验证码不存在")
+	}
+
+	captcha, ok := value.(*biz.Captcha)
+	if !ok {
+		return nil, fmt.Errorf("验证码类型错误")
+	}
+
+	return captcha, nil
+}
+
+func (r *userRepo) MarkCaptchaUsed(ctx context.Context, captchaID string) error {
+	value, ok := r.captchas.Load(captchaID)
+	if !ok {
+		return fmt.Errorf("验证码不存在")
+	}
+
+	captcha, ok := value.(*biz.Captcha)
+	if !ok {
+		return fmt.Errorf("验证码类型错误")
+	}
+
+	captcha.Used = true
+	r.captchas.Store(captchaID, captcha)
+
+	return nil
+}
+
+// 账户锁定相关方法
+func (r *userRepo) GetLock(ctx context.Context, username string) (*biz.AccountLock, error) {
+	value, ok := r.accountLocks.Load(username)
+	if !ok {
+		return nil, biz.ErrUserNotFound
+	}
+
+	lock, ok := value.(*biz.AccountLock)
+	if !ok {
+		return nil, fmt.Errorf("账户锁定信息类型错误")
+	}
+
+	return lock, nil
+}
+
+func (r *userRepo) SaveLock(ctx context.Context, lock *biz.AccountLock) error {
+	r.accountLocks.Store(lock.Username, lock)
+	return nil
+}
+
+func (r *userRepo) RemoveLock(ctx context.Context, username string) error {
+	r.accountLocks.Delete(username)
+	return nil
+}
+
+// 刷新令牌相关方法
+func (r *userRepo) SaveRefreshToken(ctx context.Context, username, tokenID string, expiresAt time.Time) error {
+	r.refreshTokens.Store(tokenID, &refreshTokenInfo{
+		username: username,
+		used:     false,
+		expireAt: expiresAt,
+	})
+	return nil
+}
+
+func (r *userRepo) GetRefreshToken(ctx context.Context, tokenID string) (string, bool, error) {
+	value, ok := r.refreshTokens.Load(tokenID)
+	if !ok {
+		return "", false, fmt.Errorf("刷新令牌不存在")
+	}
+
+	info, ok := value.(*refreshTokenInfo)
+	if !ok {
+		return "", false, fmt.Errorf("刷新令牌信息类型错误")
+	}
+
+	// 检查令牌是否过期
+	if info.expireAt.Before(time.Now()) {
+		r.refreshTokens.Delete(tokenID)
+		return "", false, fmt.Errorf("刷新令牌已过期")
+	}
+
+	return info.username, info.used, nil
+}
+
+func (r *userRepo) InvalidateRefreshToken(ctx context.Context, tokenID string) error {
+	value, ok := r.refreshTokens.Load(tokenID)
+	if !ok {
+		return fmt.Errorf("刷新令牌不存在")
+	}
+
+	info, ok := value.(*refreshTokenInfo)
+	if !ok {
+		return fmt.Errorf("刷新令牌信息类型错误")
+	}
+
+	// 标记为已使用
+	info.used = true
+	r.refreshTokens.Store(tokenID, info)
+
+	return nil
+}
+
+func (r *userRepo) InvalidateAllRefreshTokens(ctx context.Context, username string) error {
+	// 遍历所有令牌，将该用户的所有令牌标记为已使用
+	r.refreshTokens.Range(func(key, value interface{}) bool {
+		info, ok := value.(*refreshTokenInfo)
+		if ok && info.username == username {
+			info.used = true
+			r.refreshTokens.Store(key, info)
+		}
+		return true
+	})
+
+	return nil
 }

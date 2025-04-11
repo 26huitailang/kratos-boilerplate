@@ -8,6 +8,21 @@ option go_package = "xredline/api/auth/v1;v1";
 
 // 认证服务接口定义
 service Auth {
+  // 获取验证码
+  rpc GetCaptcha(GetCaptchaRequest) returns (GetCaptchaReply) {
+    option (google.api.http) = {
+      get: "/v1/auth/captcha"
+    };
+  }
+  
+  // 验证验证码
+  rpc VerifyCaptcha(VerifyCaptchaRequest) returns (VerifyCaptchaReply) {
+    option (google.api.http) = {
+      post: "/v1/auth/captcha/verify"
+      body: "*"
+    };
+  }
+
   // 用户注册
   rpc Register(RegisterRequest) returns (RegisterReply) {
     option (google.api.http) = {
@@ -15,6 +30,7 @@ service Auth {
       body: "*"
     };
   }
+  
   // 用户登录
   rpc Login(LoginRequest) returns (LoginReply) {
     option (google.api.http) = {
@@ -22,12 +38,66 @@ service Auth {
       body: "*"
     };
   }
+  
+  // 退出登录
+  rpc Logout(LogoutRequest) returns (LogoutReply) {
+    option (google.api.http) = {
+      post: "/v1/auth/logout"
+      body: "*"
+    };
+  }
+  
+  // 刷新令牌
+  rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenReply) {
+    option (google.api.http) = {
+      post: "/v1/auth/refresh"
+      body: "*"
+    };
+  }
+  
+  // 查询账户锁定状态
+  rpc LockStatus(LockStatusRequest) returns (LockStatusReply) {
+    option (google.api.http) = {
+      get: "/v1/auth/lock-status/{username}"
+    };
+  }
+}
+
+// 获取验证码请求
+message GetCaptchaRequest {
+  // 验证码类型: sms, email, image
+  string captcha_type = 1;
+  // 如果是短信/邮件验证码，需要提供手机号/邮箱
+  string target = 2;
+}
+
+// 获取验证码响应
+message GetCaptchaReply {
+  // 验证码ID
+  string captcha_id = 1;
+  // 如果是图片验证码，返回图片内容（base64编码）
+  string image_data = 2;
+}
+
+// 验证验证码请求
+message VerifyCaptchaRequest {
+  string captcha_id = 1;
+  string captcha_code = 2;
+}
+
+// 验证验证码响应
+message VerifyCaptchaReply {
+  bool success = 1;
 }
 
 // 注册请求
 message RegisterRequest {
   string username = 1;
   string password = 2;
+  string email = 3;
+  string phone = 4;
+  string captcha_id = 5;
+  string captcha_code = 6;
 }
 
 // 注册响应
@@ -39,9 +109,48 @@ message RegisterReply {
 message LoginRequest {
   string username = 1;
   string password = 2;
+  string captcha_id = 3; 
+  string captcha_code = 4;
+  // 如果启用TOTP，需要提供TOTP码
+  string totp_code = 5;
 }
 
 // 登录响应
 message LoginReply {
-  string token = 1;
+  string access_token = 1;
+  string refresh_token = 2;
+  int64 expires_in = 3;  // 过期时间（秒）
+}
+
+// 退出登录请求
+message LogoutRequest {}
+
+// 退出登录响应
+message LogoutReply {
+  bool success = 1;
+}
+
+// 刷新令牌请求
+message RefreshTokenRequest {
+  string refresh_token = 1;
+}
+
+// 刷新令牌响应
+message RefreshTokenReply {
+  string access_token = 1;
+  string refresh_token = 2;
+  int64 expires_in = 3;
+}
+
+// 查询账户锁定状态请求
+message LockStatusRequest {
+  string username = 1;
+}
+
+// 查询账户锁定状态响应
+message LockStatusReply {
+  bool locked = 1;
+  int64 unlock_time = 2; // 解锁时间戳（秒）
+  int32 failed_attempts = 3; // 已失败次数
+  int32 max_attempts = 4; // 最大允许失败次数
 }
