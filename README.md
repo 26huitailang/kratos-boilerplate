@@ -1,5 +1,7 @@
 # Kratos Project Template
 
+[![codecov](https://codecov.io/gh/26huitailang/cross-redline/branch/main/graph/badge.svg)](https://codecov.io/gh/26huitailang/cross-redline)
+
 ## Install Kratos
 ```
 go install github.com/go-kratos/kratos/cmd/kratos/v2@latest

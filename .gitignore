@@ -47,3 +47,6 @@ openapi.yaml
 .vscode
 *.swp
 *.swo
+
+# test
+coverage.html
