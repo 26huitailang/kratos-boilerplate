@@ -1,0 +1,54 @@
+version: "3.8"
+
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: cross-redline-dev
+    ports:
+      - "8000:8000"
+      - "9000:9000"
+    volumes:
+      - .:/app
+      - go-cache:/go
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - TZ=Asia/Shanghai
+    networks:
+      - cross-redline-network
+    tty: true
+    stdin_open: true
+
+  db:
+    image: postgres:14
+    container_name: cross-redline-db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: test
+      TZ: Asia/Shanghai
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cross-redline-network
+
+volumes:
+  postgres_data:
+    driver: local
+  go-cache:
+    driver: local
+
+networks:
+  cross-redline-network:
+    driver: bridge 

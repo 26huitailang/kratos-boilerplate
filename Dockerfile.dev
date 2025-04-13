@@ -1,0 +1,48 @@
+FROM openeuler/openeuler:24.03-lts
+
+# 安装构建工具
+RUN dnf update -y && dnf install -y \
+    wget \
+    tar \
+    nodejs \
+    npm \
+    git \
+    make \
+    vim \
+    curl \
+    protobuf \
+    protobuf-compiler \
+    && dnf clean all \
+    && rm -rf /var/cache/dnf/*
+
+# 安装指定版本的 Go
+RUN wget https://go.dev/dl/go1.24.1.linux-amd64.tar.gz && \
+    tar -C /usr/local -xzf go1.24.1.linux-amd64.tar.gz && \
+    rm go1.24.1.linux-amd64.tar.gz
+
+# 设置 Go 环境
+ENV GOPROXY=https://goproxy.cn
+ENV GO111MODULE=on
+ENV PATH=$PATH:/usr/local/go/bin
+ENV GOROOT=/usr/local/go
+ENV GOPATH=/go
+ENV PATH=$PATH:$GOPATH/bin
+
+# 创建工作目录
+WORKDIR /app
+
+# 安装开发工具
+RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest && \
+    go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest && \
+    go install github.com/go-kratos/kratos/cmd/kratos/v2@latest && \
+    go install github.com/go-kratos/kratos/cmd/protoc-gen-go-http/v2@latest && \
+    go install github.com/google/wire/cmd/wire@latest
+
+# 设置时区
+ENV TZ=Asia/Shanghai
+
+# 开放端口
+EXPOSE 8000
+EXPOSE 9000
+
+CMD ["/bin/bash"] 
