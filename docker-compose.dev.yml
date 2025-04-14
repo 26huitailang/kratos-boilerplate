@@ -7,11 +7,13 @@ services:
       dockerfile: Dockerfile.dev
     container_name: cross-redline-dev
     ports:
+      - "2222:22"
       - "8000:8000"
       - "9000:9000"
     volumes:
       - .:/app
       - go-cache:/go
+      - ~/.ssh/id_rsa.pub:/home/dev/.ssh/authorized_keys:ro
     depends_on:
       db:
         condition: service_healthy

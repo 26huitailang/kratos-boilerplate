@@ -12,8 +12,22 @@ RUN dnf update -y && dnf install -y \
     curl \
     protobuf \
     protobuf-compiler \
+    openssh-server \
     && dnf clean all \
     && rm -rf /var/cache/dnf/*
+
+# 配置 SSH
+RUN mkdir /var/run/sshd && \
+    ssh-keygen -A && \
+    sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config && \
+    sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config && \
+    sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
+
+# 创建开发用户
+RUN useradd -m -s /bin/bash dev && \
+    mkdir -p /home/dev/.ssh && \
+    chmod 700 /home/dev/.ssh && \
+    chown -R dev:dev /home/dev/.ssh
 
 # 安装指定版本的 Go
 RUN wget https://go.dev/dl/go1.24.1.linux-amd64.tar.gz && \
@@ -28,8 +42,9 @@ ENV GOROOT=/usr/local/go
 ENV GOPATH=/go
 ENV PATH=$PATH:$GOPATH/bin
 
-# 创建工作目录
+# 创建工作目录并设置权限
 WORKDIR /app
+RUN chown -R dev:dev /app /go
 
 # 安装开发工具
 RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest && \
@@ -42,7 +57,15 @@ RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest && \
 ENV TZ=Asia/Shanghai
 
 # 开放端口
-EXPOSE 8000
-EXPOSE 9000
+EXPOSE 22 8000 9000
 
-CMD ["/bin/bash"] 
+# 启动脚本
+COPY --chmod=755 <<EOF /start.sh
+#!/bin/bash
+# 启动 SSH 服务
+/usr/sbin/sshd
+# 保持容器运行
+exec tail -f /dev/null
+EOF
+
+CMD ["/start.sh"] 
