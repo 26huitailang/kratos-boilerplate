@@ -4,7 +4,7 @@ package auth.v1;
 
 import "google/api/annotations.proto";
 
-option go_package = "xredline/api/auth/v1;v1";
+option go_package = "kratos-boilerplate/api/auth/v1;v1";
 
 // 认证服务接口定义
 service Auth {

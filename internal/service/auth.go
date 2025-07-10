@@ -3,8 +3,8 @@ package service
 import (
 	"context"
 
-	v1 "xredline/api/auth/v1"
-	"xredline/internal/biz"
+	v1 "kratos-boilerplate/api/auth/v1"
+	"kratos-boilerplate/internal/biz"
 
 	"github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/log"

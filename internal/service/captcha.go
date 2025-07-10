@@ -3,9 +3,9 @@ package service
 import (
 	"context"
 	"encoding/base64"
+	"kratos-boilerplate/internal/biz"
 	"math/rand"
 	"time"
-	"xredline/internal/biz"
 )
 
 type captchaService struct {

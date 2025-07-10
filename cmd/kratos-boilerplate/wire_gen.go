@@ -9,11 +9,11 @@ package main
 import (
 	"github.com/go-kratos/kratos/v2"
 	"github.com/go-kratos/kratos/v2/log"
-	"xredline/internal/biz"
-	"xredline/internal/conf"
-	"xredline/internal/data"
-	"xredline/internal/server"
-	"xredline/internal/service"
+	"kratos-boilerplate/internal/biz"
+	"kratos-boilerplate/internal/conf"
+	"kratos-boilerplate/internal/data"
+	"kratos-boilerplate/internal/server"
+	"kratos-boilerplate/internal/service"
 )
 
 import (

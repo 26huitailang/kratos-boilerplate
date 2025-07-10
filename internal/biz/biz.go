@@ -1,8 +1,8 @@
 package biz
 
 import (
+	"kratos-boilerplate/internal/conf"
 	"time"
-	"xredline/internal/conf"
 
 	"github.com/google/wire"
 )

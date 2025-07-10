@@ -2,8 +2,8 @@ package data
 
 import (
 	"context"
+	"kratos-boilerplate/internal/biz"
 	"time"
-	"xredline/internal/biz"
 )
 
 type captchaRepo struct {

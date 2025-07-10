@@ -1,9 +1,9 @@
 package server
 
 import (
-	v1 "xredline/api/helloworld/v1"
-	"xredline/internal/conf"
-	"xredline/internal/service"
+	v1 "kratos-boilerplate/api/helloworld/v1"
+	"kratos-boilerplate/internal/conf"
+	"kratos-boilerplate/internal/service"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware/recovery"

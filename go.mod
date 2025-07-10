@@ -1,4 +1,4 @@
-module xredline
+module kratos-boilerplate
 
 go 1.24
 
