@@ -108,7 +108,7 @@ func formatContent(req interface{}) string {
 	return ""
 }
 
-// 格式化响应结果
+// formatResult returns a string summarizing the result of an operation, indicating "success" if no error occurred or "error: <message>" if an error is present.
 func formatResult(reply interface{}, err error) string {
 	if err != nil {
 		return "error: " + err.Error()
