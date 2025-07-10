@@ -1,0 +1,36 @@
+---
+description: 项目目录结构说明
+alwaysApply: false
+---
+# 项目目录结构说明
+
+本项目采用前后端分离架构，主要目录和文件说明如下：
+
+- `api/`：存放 gRPC/Protobuf 接口定义文件，按业务模块划分子目录。
+  - `auth/`、`helloworld/`：不同业务模块的 proto 文件。
+- `cmd/`：服务入口目录，包含各服务的启动文件（如 main.go、wire.go）。
+- `configs/`：配置文件目录（如 config.yaml）。
+- `docker-compose*.yml`、`Dockerfile*`：容器编排与镜像构建相关文件。
+- `docs/`：项目文档与开发说明。
+- `frontend/`：前端项目（Vue3 + Vite），包含页面、组件、API 封装等。
+  - `src/`：前端源码目录。
+    - `api/`：前端 API 请求封装。
+    - `components/`：通用组件。
+    - `router/`：路由配置。
+    - `stores/`：状态管理（如 Pinia）。
+    - `views/`：页面视图。
+    - `assets/`：静态资源。
+    - `types/`：类型定义。
+- `internal/`：Go 后端核心业务代码，按领域分层：
+  - `biz/`：领域业务逻辑。
+  - `conf/`：配置相关代码。
+  - `data/`：数据访问与持久化。
+  - `middleware/`：中间件实现。
+  - `pkg/`：通用工具包（如加密、验证码等）。
+  - `server/`：服务启动与中间件注册。
+  - `service/`：服务实现层，承接 API 与业务逻辑。
+- `migrations/`：数据库迁移脚本。
+- `scripts/`：自动化脚本（如测试脚本）。
+- `third_party/`：第三方 proto 文件与依赖。
+- `go.mod`、`go.sum`：Go 依赖管理文件。
+- `README.md`、`LICENSE`：项目说明与开源协议。
