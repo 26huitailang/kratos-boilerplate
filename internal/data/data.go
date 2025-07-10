@@ -2,7 +2,7 @@ package data
 
 import (
 	"database/sql"
-	"xredline/internal/conf"
+	"kratos-boilerplate/internal/conf"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/wire"

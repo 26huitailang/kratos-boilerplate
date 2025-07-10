@@ -3,8 +3,8 @@ package service
 import (
 	"context"
 
-	v1 "xredline/api/helloworld/v1"
-	"xredline/internal/biz"
+	v1 "kratos-boilerplate/api/helloworld/v1"
+	"kratos-boilerplate/internal/biz"
 )
 
 // GreeterService is a greeter service.

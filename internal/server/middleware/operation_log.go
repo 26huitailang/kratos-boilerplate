@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"xredline/internal/biz"
+	"kratos-boilerplate/internal/biz"
 
 	"github.com/go-kratos/kratos/v2/middleware"
 	"github.com/go-kratos/kratos/v2/transport"

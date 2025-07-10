@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"xredline/internal/biz"
-	"xredline/internal/pkg/crypto"
+	"kratos-boilerplate/internal/biz"
+	"kratos-boilerplate/internal/pkg/crypto"
 
 	"github.com/go-kratos/kratos/v2/log"
 )

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"xredline/internal/biz"
+	"kratos-boilerplate/internal/biz"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/stretchr/testify/assert"

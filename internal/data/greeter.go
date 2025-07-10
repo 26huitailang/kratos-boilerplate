@@ -3,7 +3,7 @@ package data
 import (
 	"context"
 
-	"xredline/internal/biz"
+	"kratos-boilerplate/internal/biz"
 
 	"github.com/go-kratos/kratos/v2/log"
 )
