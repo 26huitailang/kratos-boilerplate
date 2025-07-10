@@ -1,0 +1,50 @@
+---
+globs: **/*_test.go
+alwaysApply: false
+---
+# Golang 单元测试规则
+
+## 文件与函数命名
+- 测试文件必须以 `_test.go` 结尾。
+- 测试函数必须以 `Test` 前缀命名，签名为 `func TestXxx(t *testing.T)`。
+
+## 断言与验证
+- 使用标准库 `testing` 包进行断言。
+- 推荐结合 `github.com/stretchr/testify/assert` 等断言库提升可读性。
+- 每个测试用例必须包含至少一个断言。
+
+## 覆盖率
+- 单元测试应覆盖所有核心逻辑分支，目标覆盖率建议不低于 80%。
+- 可通过 `go test -cover` 检查覆盖率。
+
+## 表驱动测试
+- 推荐使用表驱动测试模式，提升用例扩展性与可维护性。
+- 表驱动测试示例：
+```go
+tests := []struct {
+    name string
+    input int
+    want  int
+}{
+    {"case1", 1, 2},
+    {"case2", 2, 4},
+}
+for _, tt := range tests {
+    t.Run(tt.name, func(t *testing.T) {
+        got := SomeFunc(tt.input)
+        if got != tt.want {
+            t.Errorf("got %v, want %v", got, tt.want)
+        }
+    })
+}
+```
+
+## Mock 与依赖隔离
+- 对外部依赖（如数据库、HTTP 服务等）应使用 mock 或 stub 进行隔离。
+- 推荐使用 `github.com/golang/mock/gomock`、`github.com/stretchr/testify/mock` 等库。
+
+## 其他最佳实践
+- 测试应具备幂等性，不依赖外部状态。
+- 测试用例应简洁明了，便于定位问题。
+- 遇到 panic 应使用 `t.Fatal` 或 `t.FailNow` 立即终止测试。
+- 长时间运行的测试应加上 `t.Parallel()` 或合理的超时控制。

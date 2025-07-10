@@ -1,0 +1,381 @@
+---
+description: 代码安全审核规则
+alwaysApply: false
+---
+# 安全代码审核规则
+
+## 检查范围
+
+- 用户提交的git或者指定文件的范围
+
+## 概述
+
+本规则文件定义了代码安全审核的标准和最佳实践，涵盖SQL注入、Bash注入、路径遍历、临时文件管理等关键安全风险。
+
+## SQL注入防护规则
+
+### 1. 参数化查询检查
+
+**必须使用参数化查询，禁止直接拼接SQL语句**
+
+✅ **正确示例**：
+```go
+// 使用参数化查询
+query := "SELECT * FROM users WHERE id = ?"
+rows, err := db.QueryContext(ctx, query, userID)
+
+// 使用预处理语句
+stmt, err := db.Prepare("SELECT * FROM users WHERE username = ? AND status = ?")
+rows, err := stmt.QueryContext(ctx, username, status)
+```
+
+❌ **错误示例**：
+```go
+// 直接拼接SQL - 高风险
+query := fmt.Sprintf("SELECT * FROM users WHERE id = %s", userID)
+rows, err := db.QueryContext(ctx, query)
+
+// 使用字符串连接 - 高风险
+query := "SELECT * FROM users WHERE username = '" + username + "'"
+```
+
+### 2. 动态SQL构建检查
+
+**检查文件中的动态SQL构建模式**
+
+需要检查的关键词：
+- `fmt.Sprintf` + SQL关键词
+- 字符串连接符 `+` + SQL关键词
+- `strings.Join` + SQL语句
+
+**检查位置**：
+- [backend/pkg/assettools/client/database_*.go](mdc:backend/pkg/assettools/client/database_mysql.go)
+- [backend/internal/auditor/cron/v8migrate/sqlbuild.go](mdc:backend/internal/auditor/cron/v8migrate/sqlbuild.go)
+- [backend/internal/common/data/appdata/*.go](mdc:backend/internal/common/data/appdata/ticket.go)
+
+### 3. 用户输入验证
+
+**所有用户输入必须进行验证和转义**
+
+```go
+// 输入验证示例
+func validateUserInput(input string) error {
+    if len(input) > 100 {
+        return errors.New("input too long")
+    }
+    // 检查特殊字符
+    if strings.ContainsAny(input, "';\"\\") {
+        return errors.New("invalid characters")
+    }
+    return nil
+}
+```
+
+## Bash注入防护规则
+
+### 1. 命令执行安全
+
+**使用安全的命令执行封装**
+
+✅ **正确示例**：
+```go
+// 使用BashWithSafeArgs - 推荐
+output, err := exec.BashWithSafeArgs(ctx, "echo $1", userInput)
+
+// 使用参数化命令
+cmd := exec.CommandContext(ctx, "ls", "-la", directory)
+```
+
+❌ **错误示例**：
+```go
+// 直接执行用户输入 - 高风险
+cmd := exec.CommandContext(ctx, "bash", "-c", userInput)
+
+// 字符串拼接命令 - 高风险
+command := "ls " + userInput
+exec.CommandContext(ctx, "bash", "-c", command)
+```
+
+### 2. 参数转义检查
+
+**检查文件中的命令执行模式**
+
+**检查位置**：
+- [backend/pkg/exec/exec.go](mdc:backend/pkg/exec/exec.go)
+- [backend/pkg/remoteshell/sshshell/script.go](mdc:backend/pkg/remoteshell/sshshell/script.go)
+- [backend/pkg/chpass/database/chpass_tool.go](mdc:backend/pkg/chpass/database/chpass_tool.go)
+
+### 3. 权限控制
+
+**确保命令执行有适当的权限控制**
+
+```go
+// 权限检查示例
+func executeWithPrivilegeCheck(ctx context.Context, command string, args []string) error {
+    // 检查用户权限
+    if !hasRequiredPermission() {
+        return errors.New("insufficient privileges")
+    }
+    
+    // 白名单检查
+    if !isCommandAllowed(command) {
+        return errors.New("command not allowed")
+    }
+    
+    return exec.RunCommandContext(ctx, command, args...)
+}
+```
+
+## 路径遍历防护规则
+
+### 1. 路径验证
+
+**所有文件路径必须进行验证**
+
+✅ **正确示例**：
+```go
+// 使用filepath.Clean和路径检查
+func validatePath(basePath, userPath string) (string, error) {
+    // 清理路径
+    cleanPath := filepath.Clean(userPath)
+    
+    // 检查路径遍历
+    if strings.Contains(cleanPath, "..") {
+        return "", errors.New("path traversal detected")
+    }
+    
+    // 确保路径在允许的范围内
+    fullPath := filepath.Join(basePath, cleanPath)
+    if !strings.HasPrefix(fullPath, basePath) {
+        return "", errors.New("path outside allowed directory")
+    }
+    
+    return fullPath, nil
+}
+```
+
+❌ **错误示例**：
+```go
+// 直接使用用户输入路径 - 高风险
+file, err := os.Open(userPath)
+
+// 未验证的路径拼接 - 高风险
+fullPath := basePath + "/" + userPath
+```
+
+### 2. 文件系统操作检查
+
+**检查文件系统相关代码**
+
+**检查位置**：
+- [backend/internal/terminal/websso/webfs/server/volume/fs.go](mdc:backend/internal/terminal/websso/webfs/server/volume/fs.go)
+- [backend/internal/apiserver/server/web.go](mdc:backend/internal/apiserver/server/web.go)
+- [backend/internal/auditor/pkg/vfs/backend/local/filesystem.go](mdc:backend/internal/auditor/pkg/vfs/backend/local/filesystem.go)
+
+### 3. 目录遍历防护
+
+**防止任意目录访问**
+
+```go
+// 安全的目录遍历
+func safeReadDir(dirPath string) ([]os.FileInfo, error) {
+    // 验证目录路径
+    if !isValidDirectory(dirPath) {
+        return nil, errors.New("invalid directory")
+    }
+    
+    // 限制遍历深度
+    if getPathDepth(dirPath) > maxDepth {
+        return nil, errors.New("path too deep")
+    }
+    
+    return os.ReadDir(dirPath)
+}
+```
+
+## 临时文件管理规则
+
+### 1. 文件创建安全
+
+**临时文件必须安全创建和清理**
+
+✅ **正确示例**：
+```go
+// 使用os.CreateTemp创建临时文件
+tmpFile, err := os.CreateTemp("", "prefix_*")
+if err != nil {
+    return err
+}
+defer os.Remove(tmpFile.Name()) // 确保清理
+defer tmpFile.Close()
+
+// 设置适当的权限
+os.Chmod(tmpFile.Name(), 0600)
+```
+
+❌ **错误示例**：
+```go
+// 使用可预测的文件名 - 高风险
+tmpFile, err := os.Create("/tmp/myfile.txt")
+
+// 未设置权限 - 高风险
+tmpFile, err := os.CreateTemp("", "")
+// 缺少权限设置和清理
+```
+
+### 2. 文件清理机制
+
+**检查临时文件清理代码**
+
+**检查位置**：
+- [backend/pkg/io/fileutil/tmpfile.go](mdc:backend/pkg/io/fileutil/tmpfile.go)
+- [backend/internal/common/data/appdata/temporary.go](mdc:backend/internal/common/data/appdata/temporary.go)
+- [backend/internal/schedule/callback/simpletimedtask/callback.go](mdc:backend/internal/schedule/callback/simpletimedtask/callback.go)
+
+### 3. 自动清理策略
+
+**实现自动清理机制**
+
+```go
+// 自动清理过期文件
+func cleanupExpiredFiles(dir string, maxAge time.Duration) error {
+    return filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+        if err != nil {
+            return err
+        }
+        
+        if !info.IsDir() && time.Since(info.ModTime()) > maxAge {
+            return os.Remove(path)
+        }
+        
+        return nil
+    })
+}
+```
+
+## 代码审查清单
+
+### 1. SQL相关检查
+
+- [ ] 是否使用参数化查询？
+- [ ] 是否避免字符串拼接SQL？
+- [ ] 是否对用户输入进行验证？
+- [ ] 是否使用预处理语句？
+- [ ] 是否限制了SQL查询的复杂度？
+
+### 2. 命令执行检查
+
+- [ ] 是否使用安全的命令执行封装？
+- [ ] 是否对命令参数进行转义？
+- [ ] 是否实现了命令白名单？
+- [ ] 是否检查了执行权限？
+- [ ] 是否限制了命令执行环境？
+
+### 3. 文件操作检查
+
+- [ ] 是否验证了文件路径？
+- [ ] 是否防止了路径遍历？
+- [ ] 是否设置了适当的文件权限？
+- [ ] 是否实现了文件访问控制？
+- [ ] 是否限制了文件操作范围？
+
+### 4. 临时文件检查
+
+- [ ] 是否使用安全的临时文件创建？
+- [ ] 是否实现了自动清理机制？
+- [ ] 是否设置了适当的文件权限？
+- [ ] 是否避免了可预测的文件名？
+- [ ] 是否在异常情况下也能清理文件？
+
+### 5. 输入验证检查
+
+- [ ] 是否对所有用户输入进行验证？
+- [ ] 是否实现了输入长度限制？
+- [ ] 是否检查了特殊字符？
+- [ ] 是否使用了白名单验证？
+- [ ] 是否实现了输入编码处理？
+
+## 自动化检测建议
+
+### 1. 静态分析工具
+
+- **gosec**: Go语言安全静态分析工具
+- **staticcheck**: Go代码静态分析
+- **golangci-lint**: 综合代码检查工具
+
+### 2. 自定义检查脚本
+
+参考现有的SQL注入检查脚本：
+- [security/check_sql_injection.sh](mdc:security/check_sql_injection.sh)
+
+### 3. 代码审查工具
+
+- **SonarQube**: 代码质量分析平台
+- **CodeQL**: GitHub的代码分析引擎
+- **Semgrep**: 语义化代码搜索工具
+
+## 最佳实践
+
+### 1. 安全编码原则
+
+- **最小权限原则**: 只授予必要的权限
+- **输入验证**: 验证所有外部输入
+- **输出编码**: 对输出进行适当的编码
+- **错误处理**: 安全的错误处理，不泄露敏感信息
+- **日志记录**: 记录安全相关事件
+
+### 2. 代码示例
+
+```go
+// 安全的数据库操作
+func safeQueryUser(ctx context.Context, db *sql.DB, userID string) (*User, error) {
+    // 输入验证
+    if err := validateUserID(userID); err != nil {
+        return nil, err
+    }
+    
+    // 使用参数化查询
+    query := "SELECT id, username, email FROM users WHERE id = ?"
+    row := db.QueryRowContext(ctx, query, userID)
+    
+    var user User
+    if err := row.Scan(&user.ID, &user.Username, &user.Email); err != nil {
+        return nil, err
+    }
+    
+    return &user, nil
+}
+
+// 安全的文件操作
+func safeReadFile(basePath, fileName string) ([]byte, error) {
+    // 路径验证
+    cleanFileName := filepath.Clean(fileName)
+    if strings.Contains(cleanFileName, "..") {
+        return nil, errors.New("path traversal detected")
+    }
+    
+    // 构建安全路径
+    fullPath := filepath.Join(basePath, cleanFileName)
+    if !strings.HasPrefix(fullPath, basePath) {
+        return nil, errors.New("path outside allowed directory")
+    }
+    
+    return os.ReadFile(fullPath)
+}
+```
+
+## 安全事件响应
+
+### 1. 漏洞报告流程
+
+1. 发现安全漏洞
+2. 评估漏洞严重程度
+3. 制定修复计划
+4. 实施安全修复
+5. 验证修复效果
+6. 更新安全文档
+7. 举一反三（工具扫描>人工排查）
+
+---
+
+**注意**: 本规则文件应定期更新，以适应新的安全威胁和最佳实践。所有开发人员都应熟悉并遵循这些安全规则。
