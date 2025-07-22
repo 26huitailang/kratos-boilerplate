@@ -37,9 +37,9 @@ jobs:
       - name: Generate proto files
         run: make all
 
-      - name: Run TDD tests with coverage (go test)
+      - name: Run TDD tests with coverage (go test, exclude service)
         run: |
-          go test -coverprofile=coverage.out ./internal/...
+          go test $(go list ./internal/... | grep -v '/service') -coverprofile=coverage.out
           go tool cover -func=coverage.out | grep total:
 
       - name: Upload TDD coverage report

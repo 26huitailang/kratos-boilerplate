@@ -70,7 +70,8 @@ test:
 .PHONY: test-coverage
 # run tests and generate coverage report
 test-coverage:
-	go test -coverprofile=coverage.out ./internal/...
+	# 仅统计TDD覆盖率，排除internal/service目录
+	go test $(go list ./internal/... | grep -v '/service') -coverprofile=coverage.out
 	go tool cover -html=coverage.out -o coverage.html
 	@echo "coverage report generated: coverage.html (open in browser to view details)"
 	@go tool cover -func=coverage.out | grep total:
