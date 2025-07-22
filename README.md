@@ -1,6 +1,6 @@
 # Kratos Project Template
 
-[![codecov](https://codecov.io/gh/26huitailang/cross-redline/branch/main/graph/badge.svg)](https://codecov.io/gh/26huitailang/cross-redline)
+[![codecov](https://codecov.io/gh/26huitailang/kratos-boilerplate/branch/main/graph/badge.svg)](https://codecov.io/gh/26huitailang/kratos-boilerplate)
 
 ## Install Kratos
 ```
