@@ -37,20 +37,19 @@ jobs:
       - name: Generate proto files
         run: make all
 
-      - name: Run tests
-        run: make test
+      - name: Run TDD tests with coverage (go test)
+        run: |
+          go test -coverprofile=coverage.out ./internal/...
+          go tool cover -func=coverage.out | grep total:
 
-      - name: Generate coverage report
-        run: make test-coverage
-
-      - name: Upload coverage report
+      - name: Upload TDD coverage report
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
           path: coverage.out
 
       - name: Generate HTML coverage report
-        run: make test-coverage-html
+        run: go tool cover -html=coverage.out -o coverage.html
 
       - name: Upload HTML coverage report
         uses: actions/upload-artifact@v4
@@ -58,6 +57,14 @@ jobs:
           name: coverage-html
           path: coverage.html
 
+      # BDD测试不关注覆盖率，仅需业务流程通过
+      - name: Install ginkgo CLI
+        run: go install github.com/onsi/ginkgo/v2/ginkgo@latest
+
+      - name: Run BDD tests (ginkgo)
+        run: ginkgo -r ./internal/service
+
+      # 如需上传覆盖率到Codecov，仅上传TDD部分
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
