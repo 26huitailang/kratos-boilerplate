@@ -78,3 +78,15 @@ After starting the service, you can access the Swagger UI at:
 http://localhost:8000/q/swagger-ui/
 ```
 
+## 测试规范与运行
+
+本项目采用TDD（底层逻辑）+ BDD（业务逻辑）混合测试策略：
+- TDD：底层模块使用Go原生testing+testify，见internal/biz、internal/pkg等目录。
+- BDD：业务流程使用ginkgo/gomega，见internal/service目录。
+
+一键运行所有测试：
+```sh
+scripts/run_tests.sh
+```
+- 运行后会自动生成 coverage.html 覆盖率报告，可用浏览器打开查看详细覆盖情况。
+- 覆盖率建议 >80%，详细规范见 docs/测试规范.md。

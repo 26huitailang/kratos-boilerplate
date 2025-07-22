@@ -116,6 +116,24 @@ func (m *mockUserRepo) MarkCaptchaUsed(ctx context.Context, captchaID string) er
 	return args.Error(0)
 }
 
+// 表驱动TDD测试示例
+func TestMultiply_TableDriven(t *testing.T) {
+	tests := []struct {
+		name string
+		a, b int
+		want int
+	}{
+		{"2*3", 2, 3, 6},
+		{"4*5", 4, 5, 20},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.a * tt.b
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 // 测试用例
 func TestGenerate_Image(t *testing.T) {
 	// 准备测试依赖

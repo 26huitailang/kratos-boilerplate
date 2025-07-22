@@ -508,3 +508,21 @@ func generateTestRefreshToken(username string, userID int64, secretKey string) (
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(secretKey))
 }
+
+// 表驱动TDD测试示例
+func TestAdd_TableDriven(t *testing.T) {
+	tests := []struct {
+		name string
+		a, b int
+		want int
+	}{
+		{"1+1", 1, 1, 2},
+		{"2+2", 2, 2, 4},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.a + tt.b
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}

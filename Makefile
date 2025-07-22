@@ -71,6 +71,9 @@ test:
 # run tests and generate coverage report
 test-coverage:
 	go test -coverprofile=coverage.out ./internal/...
+	go tool cover -html=coverage.out -o coverage.html
+	@echo "coverage report generated: coverage.html (open in browser to view details)"
+	@go tool cover -func=coverage.out | grep total:
 
 .PHONY: test-coverage-html
 # run tests and generate html coverage report

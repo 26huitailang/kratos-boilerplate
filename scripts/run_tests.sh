@@ -2,36 +2,16 @@
 
 set -e
 
-# 记录开始时间
-start_time=$(date +%s)
+echo "running go test (TDD)..."
+go test -coverprofile=coverage.out ./internal/... > tdd_test.log
+cat tdd_test.log
 
-# 输出彩色文本
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+echo "generating coverage report..."
+go tool cover -html=coverage.out -o coverage.html
+echo "coverage report generated: coverage.html (open in browser to view details)"
 
-# 项目根目录
-ROOT_DIR=$(pwd)
+COVERAGE=$(go tool cover -func=coverage.out | grep total: | awk '{print $3}')
+echo "total coverage: $COVERAGE"
 
-echo -e "${BLUE}开始运行测试...${NC}"
-
-# 运行认证模块测试
-echo -e "${YELLOW}测试认证模块 (internal/biz)...${NC}"
-go test -v -cover ./internal/biz/...
-
-echo -e "${YELLOW}测试验证码模块 (internal/pkg/captcha)...${NC}"
-go test -v -cover ./internal/pkg/captcha/...
-
-echo -e "${YELLOW}测试数据层 (internal/data)...${NC}"
-go test -v -cover ./internal/data/...
-
-# 计算覆盖率
-echo -e "${YELLOW}计算总体测试覆盖率...${NC}"
-go test -cover ./internal/... | grep -v "no test files" | awk '{sum+=$5; count++} END {print "平均覆盖率:", sum/count, "%"}'
-
-# 记录结束时间并计算总用时
-end_time=$(date +%s)
-duration=$((end_time - start_time))
-echo -e "${GREEN}测试完成! 总用时: ${duration}秒${NC}"
+echo "running ginkgo (BDD)..."
+ginkgo -r ./internal/service || echo "ginkgo not installed, please run: go install github.com/onsi/ginkgo/v2/ginkgo@latest"
