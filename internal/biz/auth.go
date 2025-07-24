@@ -117,7 +117,7 @@ type CaptchaService interface {
 	Verify(ctx context.Context, captchaID, captchaCode string) (bool, error)
 }
 
-// Auth配置
+// AuthConfig 认证配置
 type AuthConfig struct {
 	// JWT配置
 	JWTSecretKey           string
@@ -148,8 +148,21 @@ var DefaultAuthConfig = AuthConfig{
 	TOTPEnabled:            false,
 }
 
-// AuthUsecase 认证用例
-type AuthUsecase struct {
+// AuthUsecase defines the interface for authentication use cases.
+type AuthUsecase interface {
+	Register(ctx context.Context, username, password, email, phone, captchaID, captchaCode string) error
+	Login(ctx context.Context, username, password, captchaID, captchaCode, totpCode string) (*TokenPair, error)
+	Logout(ctx context.Context, accessToken string) error
+	RefreshToken(ctx context.Context, refreshToken string) (*TokenPair, error)
+	GetCaptcha(ctx context.Context, captchaType, target string) (*Captcha, error)
+	VerifyCaptcha(ctx context.Context, captchaID, captchaCode string) (bool, error)
+	GetLockStatus(ctx context.Context, username string) (*AccountLock, error)
+	Now() time.Time
+	GetMaxLoginAttempts() int32
+}
+
+// authUsecase is the implementation of AuthUsecase.
+type authUsecase struct {
 	repo           UserRepo
 	captchaService CaptchaService
 	config         AuthConfig
@@ -158,12 +171,12 @@ type AuthUsecase struct {
 	tokenBlacklist sync.Map
 }
 
-// NewAuthUsecase 创建认证用例
-func NewAuthUsecase(repo UserRepo, captchaService CaptchaService, config AuthConfig, logger log.Logger) *AuthUsecase {
+// NewAuthUsecase creates a new authUsecase instance.
+func NewAuthUsecase(repo UserRepo, captchaService CaptchaService, config AuthConfig, logger log.Logger) AuthUsecase {
 	if config.JWTSecretKey == "" {
 		config = DefaultAuthConfig
 	}
-	return &AuthUsecase{
+	return &authUsecase{
 		repo:           repo,
 		captchaService: captchaService,
 		config:         config,
@@ -172,7 +185,7 @@ func NewAuthUsecase(repo UserRepo, captchaService CaptchaService, config AuthCon
 }
 
 // Register 用户注册
-func (uc *AuthUsecase) Register(ctx context.Context, username, password, email, phone string, captchaID, captchaCode string) error {
+func (uc *authUsecase) Register(ctx context.Context, username, password, email, phone string, captchaID, captchaCode string) error {
 	// 验证验证码
 	if uc.config.CaptchaEnabled {
 		if captchaID == "" || captchaCode == "" {
@@ -243,7 +256,7 @@ func (uc *AuthUsecase) Register(ctx context.Context, username, password, email, 
 }
 
 // Login 用户登录
-func (uc *AuthUsecase) Login(ctx context.Context, username, password, captchaID, captchaCode, totpCode string) (*TokenPair, error) {
+func (uc *authUsecase) Login(ctx context.Context, username, password, captchaID, captchaCode, totpCode string) (*TokenPair, error) {
 	// 检查账户是否被锁定
 	lock, err := uc.repo.GetLock(ctx, username)
 	if err != nil && err != ErrUserNotFound {
@@ -312,7 +325,7 @@ func (uc *AuthUsecase) Login(ctx context.Context, username, password, captchaID,
 }
 
 // Logout 退出登录
-func (uc *AuthUsecase) Logout(ctx context.Context, accessToken string) error {
+func (uc *authUsecase) Logout(ctx context.Context, accessToken string) error {
 	// 将访问令牌加入黑名单
 	claims, err := uc.parseAccessToken(accessToken)
 	if err != nil {
@@ -340,7 +353,7 @@ func (uc *AuthUsecase) Logout(ctx context.Context, accessToken string) error {
 }
 
 // RefreshToken 刷新令牌
-func (uc *AuthUsecase) RefreshToken(ctx context.Context, refreshToken string) (*TokenPair, error) {
+func (uc *authUsecase) RefreshToken(ctx context.Context, refreshToken string) (*TokenPair, error) {
 	// 解析刷新令牌
 	claims, err := uc.parseRefreshToken(refreshToken)
 	if err != nil {
@@ -385,17 +398,17 @@ func (uc *AuthUsecase) RefreshToken(ctx context.Context, refreshToken string) (*
 }
 
 // GetCaptcha 获取验证码
-func (uc *AuthUsecase) GetCaptcha(ctx context.Context, captchaType, target string) (*Captcha, error) {
+func (uc *authUsecase) GetCaptcha(ctx context.Context, captchaType, target string) (*Captcha, error) {
 	return uc.captchaService.Generate(ctx, captchaType, target)
 }
 
 // VerifyCaptcha 验证验证码
-func (uc *AuthUsecase) VerifyCaptcha(ctx context.Context, captchaID, captchaCode string) (bool, error) {
+func (uc *authUsecase) VerifyCaptcha(ctx context.Context, captchaID, captchaCode string) (bool, error) {
 	return uc.captchaService.Verify(ctx, captchaID, captchaCode)
 }
 
 // GetLockStatus 获取账户锁定状态
-func (uc *AuthUsecase) GetLockStatus(ctx context.Context, username string) (*AccountLock, error) {
+func (uc *authUsecase) GetLockStatus(ctx context.Context, username string) (*AccountLock, error) {
 	lock, err := uc.repo.GetLock(ctx, username)
 	if err != nil {
 		if err == ErrUserNotFound {
@@ -428,7 +441,7 @@ func (uc *AuthUsecase) GetLockStatus(ctx context.Context, username string) (*Acc
 }
 
 // 生成令牌对
-func (uc *AuthUsecase) generateTokens(ctx context.Context, user *User) (*TokenPair, error) {
+func (uc *authUsecase) generateTokens(ctx context.Context, user *User) (*TokenPair, error) {
 	now := time.Now()
 
 	// 生成access token
@@ -476,7 +489,7 @@ func (uc *AuthUsecase) generateTokens(ctx context.Context, user *User) (*TokenPa
 }
 
 // 解析访问令牌
-func (uc *AuthUsecase) parseAccessToken(tokenStr string) (jwt.MapClaims, error) {
+func (uc *authUsecase) parseAccessToken(tokenStr string) (jwt.MapClaims, error) {
 	// 检查令牌是否在黑名单中
 	if _, ok := uc.tokenBlacklist.Load(tokenStr); ok {
 		return nil, ErrTokenInvalid
@@ -507,7 +520,7 @@ func (uc *AuthUsecase) parseAccessToken(tokenStr string) (jwt.MapClaims, error) 
 }
 
 // 解析刷新令牌
-func (uc *AuthUsecase) parseRefreshToken(tokenStr string) (jwt.MapClaims, error) {
+func (uc *authUsecase) parseRefreshToken(tokenStr string) (jwt.MapClaims, error) {
 	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
@@ -533,7 +546,7 @@ func (uc *AuthUsecase) parseRefreshToken(tokenStr string) (jwt.MapClaims, error)
 }
 
 // 记录失败的登录尝试
-func (uc *AuthUsecase) recordFailedAttempt(ctx context.Context, username string) {
+func (uc *authUsecase) recordFailedAttempt(ctx context.Context, username string) {
 	// 获取当前锁定状态
 	lock, err := uc.repo.GetLock(ctx, username)
 	if err != nil {
@@ -565,7 +578,7 @@ func (uc *AuthUsecase) recordFailedAttempt(ctx context.Context, username string)
 }
 
 // 清理令牌黑名单中的过期条目
-func (uc *AuthUsecase) cleanupTokenBlacklist() {
+func (uc *authUsecase) cleanupTokenBlacklist() {
 	now := time.Now()
 	uc.tokenBlacklist.Range(func(key, value interface{}) bool {
 		exp := value.(time.Time)
@@ -577,7 +590,7 @@ func (uc *AuthUsecase) cleanupTokenBlacklist() {
 }
 
 // 验证TOTP码
-func (uc *AuthUsecase) verifyTOTP(secret, code string) bool {
+func (uc *authUsecase) verifyTOTP(secret, code string) bool {
 	// 实际项目中应该使用TOTP库实现验证
 	// 这里简单模拟
 	return code == "123456" // 临时模拟，实际应使用如 github.com/pquerna/otp
@@ -606,12 +619,12 @@ func generateRandomString(length int) string {
 }
 
 // Now 返回当前时间，便于测试中模拟时间
-func (uc *AuthUsecase) Now() time.Time {
+func (uc *authUsecase) Now() time.Time {
 	return time.Now()
 }
 
 // GetMaxLoginAttempts 返回最大登录尝试次数
-func (uc *AuthUsecase) GetMaxLoginAttempts() int32 {
+func (uc *authUsecase) GetMaxLoginAttempts() int32 {
 	return uc.config.MaxLoginAttempts
 }
 

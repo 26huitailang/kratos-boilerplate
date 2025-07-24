@@ -12,6 +12,7 @@ import (
 	"kratos-boilerplate/internal/biz"
 	"kratos-boilerplate/internal/conf"
 	"kratos-boilerplate/internal/data"
+	"kratos-boilerplate/internal/pkg/captcha"
 	"kratos-boilerplate/internal/server"
 	"kratos-boilerplate/internal/service"
 )
@@ -37,8 +38,8 @@ func wireApp(confServer *conf.Server, confData *conf.Data, auth *conf.Auth, logg
 		cleanup()
 		return nil, nil, err
 	}
-	captchaRepo := data.NewCaptchaRepo(dataData)
-	captchaService := service.NewCaptchaService(captchaRepo)
+	config := data.NewCaptchaConfig(auth)
+	captchaService := captcha.NewCaptchaService(userRepo, config, logger)
 	authConfig := biz.NewAuthConfig(auth)
 	authUsecase := biz.NewAuthUsecase(userRepo, captchaService, authConfig, logger)
 	authService := service.NewAuthService(authUsecase, logger)

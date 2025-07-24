@@ -14,11 +14,11 @@ import (
 type AuthService struct {
 	v1.UnimplementedAuthServer
 
-	uc  *biz.AuthUsecase
+	uc  biz.AuthUsecase
 	log *log.Helper
 }
 
-func NewAuthService(uc *biz.AuthUsecase, logger log.Logger) *AuthService {
+func NewAuthService(uc biz.AuthUsecase, logger log.Logger) *AuthService {
 	return &AuthService{
 		uc:  uc,
 		log: log.NewHelper(logger),
