@@ -2,6 +2,7 @@ package data
 
 import (
 	"database/sql"
+	"fmt"
 	"kratos-boilerplate/internal/conf"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -21,6 +22,16 @@ type Data struct {
 
 // NewData .
 func NewData(c *conf.Data, logger log.Logger) (*Data, func(), error) {
+	if c == nil {
+		return nil, nil, fmt.Errorf("config is nil")
+	}
+	if c.Database == nil {
+		return nil, nil, fmt.Errorf("database config is nil")
+	}
+	if c.Redis == nil {
+		return nil, nil, fmt.Errorf("redis config is nil")
+	}
+
 	db, err := sql.Open(c.Database.Driver, c.Database.Source)
 	if err != nil {
 		return nil, nil, err

@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"fmt"
 	"kratos-boilerplate/internal/biz"
 	"time"
 )
@@ -16,11 +17,17 @@ func NewCaptchaRepo(data *Data) biz.CaptchaRepo {
 
 func (r *captchaRepo) SaveCaptcha(ctx context.Context, captcha *biz.Captcha) error {
 	// 使用 Redis 存储验证码
+	if r.data.redis == nil {
+		return fmt.Errorf("redis client is not initialized")
+	}
 	key := "captcha:" + captcha.ID
 	return r.data.redis.Set(ctx, key, captcha, time.Until(captcha.ExpireAt)).Err()
 }
 
 func (r *captchaRepo) GetCaptcha(ctx context.Context, id string) (*biz.Captcha, error) {
+	if r.data.redis == nil {
+		return nil, fmt.Errorf("redis client is not initialized")
+	}
 	key := "captcha:" + id
 	var captcha biz.Captcha
 	err := r.data.redis.Get(ctx, key).Scan(&captcha)
@@ -31,6 +38,9 @@ func (r *captchaRepo) GetCaptcha(ctx context.Context, id string) (*biz.Captcha, 
 }
 
 func (r *captchaRepo) DeleteCaptcha(ctx context.Context, id string) error {
+	if r.data.redis == nil {
+		return fmt.Errorf("redis client is not initialized")
+	}
 	key := "captcha:" + id
 	return r.data.redis.Del(ctx, key).Err()
 }
