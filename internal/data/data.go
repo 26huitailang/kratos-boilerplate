@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"kratos-boilerplate/internal/conf"
+	"kratos-boilerplate/internal/pkg/captcha"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/wire"
@@ -12,7 +13,7 @@ import (
 )
 
 // ProviderSet is data providers.
-var ProviderSet = wire.NewSet(NewData, NewGreeterRepo, NewUserRepo, NewOperationLogRepo, NewCaptchaRepo)
+var ProviderSet = wire.NewSet(NewData, NewGreeterRepo, NewUserRepo, NewOperationLogRepo, NewCaptchaRepo, captcha.NewCaptchaService, NewCaptchaConfig)
 
 // Data .
 type Data struct {
@@ -57,4 +58,13 @@ func NewData(c *conf.Data, logger log.Logger) (*Data, func(), error) {
 		log.NewHelper(logger).Info("closing the data resources")
 	}
 	return &Data{db: db, redis: redisClient}, cleanup, nil
+}
+
+func NewCaptchaConfig(auth *conf.Auth) *captcha.Config {
+	return &captcha.Config{
+		EnableSMS:   auth.CaptchaEnabled,
+		EnableEmail: auth.CaptchaEnabled,
+		EnableImage: auth.CaptchaEnabled,
+		Expiration:  auth.CaptchaExpiration.AsDuration(),
+	}
 }
