@@ -24,8 +24,8 @@ func TestNewUserRepoSimple(t *testing.T) {
 	assert.NotNil(t, repo)
 }
 
-// 测试内存存储操作 - 简化版本
-func TestInMemoryStorageSimple(t *testing.T) {
+// 测试验证码操作
+func TestCaptchaOperations(t *testing.T) {
 	logger := log.NewStdLogger(os.Stdout)
 	data := &Data{}
 
