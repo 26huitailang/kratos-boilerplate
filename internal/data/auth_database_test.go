@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -218,7 +219,6 @@ func TestUserDatabaseOperations(t *testing.T) {
 
 	t.Run("CreateUser_DuplicateUsername", func(t *testing.T) {
 		assert.NoError(t, mock.ExpectationsWereMet()) // 前置清理
-
 		user := &biz.User{
 			Username: "duplicateuser",
 			Password: "hashedpassword",
@@ -226,7 +226,7 @@ func TestUserDatabaseOperations(t *testing.T) {
 			Phone:    "13800138000",
 			Name:     "重复用户",
 		}
-
+		expectedErr := fmt.Errorf("duplicate key value violates unique constraint")
 		// 设置mock期望 - 重复用户名错误
 		mock.ExpectExec("INSERT INTO users").
 			WithArgs(
@@ -236,12 +236,11 @@ func TestUserDatabaseOperations(t *testing.T) {
 				sqlmock.AnyArg(), sqlmock.AnyArg(),
 				sqlmock.AnyArg(), sqlmock.AnyArg(),
 			).
-			WillReturnError(sql.ErrConnDone)
-
+			WillReturnError(expectedErr)
 		// 执行测试
 		err := userRepo.CreateUser(ctx, user)
 		assert.Error(t, err)
-
+		assert.Equal(t, expectedErr, err)
 		assert.NoError(t, mock.ExpectationsWereMet()) // 后置清理
 	})
 }
