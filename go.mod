@@ -2,6 +2,8 @@ module kratos-boilerplate
 
 go 1.24
 
+toolchain go1.24.1
+
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/go-kratos/kratos/v2 v2.8.4
