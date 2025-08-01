@@ -4,6 +4,7 @@ package database_test
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
@@ -32,14 +33,30 @@ func (suite *AuthIntegrationTestSuite) SetupSuite() {
 	suite.logger = log.NewStdLogger(suite.T().Logf)
 	suite.ctx = context.Background()
 
+	// 从环境变量获取数据库配置
+	databaseURL := os.Getenv("TEST_DATABASE_URL")
+	if databaseURL == "" {
+		// 默认配置（本地开发环境）
+		databaseURL = "postgres://postgres:postgres@localhost:5433/test_db?sslmode=disable"
+	}
+
+	redisURL := os.Getenv("TEST_REDIS_URL")
+	if redisURL == "" {
+		// 默认配置（本地开发环境）
+		redisURL = "localhost:6380"
+	}
+
+	suite.T().Logf("Using database: %s", databaseURL)
+	suite.T().Logf("Using redis: %s", redisURL)
+
 	// 配置测试数据库
 	config := &conf.Data{
 		Database: &conf.Data_Database{
 			Driver: "postgres",
-			Source: "postgres://postgres:postgres@localhost:5432/test_db?sslmode=disable",
+			Source: databaseURL,
 		},
 		Redis: &conf.Data_Redis{
-			Addr:    "localhost:6379",
+			Addr:    redisURL,
 			Network: "tcp",
 		},
 	}
