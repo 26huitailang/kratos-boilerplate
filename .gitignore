@@ -50,6 +50,7 @@ openapi.yaml
 
 # test
 coverage.html
+test/output/
 
 # env
 .env
