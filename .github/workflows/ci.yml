@@ -1,4 +1,4 @@
-name: CI Tests
+name: Comprehensive CI Tests
 
 on:
   push:
@@ -7,8 +7,9 @@ on:
     branches: [ main ]
 
 jobs:
-  test:
-    name: Test
+  # 快速反馈 - 单元测试和BDD测试
+  fast-tests:
+    name: Fast Tests (Unit + BDD)
     runs-on: ubuntu-latest
     
     services:
@@ -48,6 +49,11 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y protobuf-compiler postgresql-client redis-tools
+          
+          # Install Docker Compose
+          sudo curl -L "https://github.com/docker/compose/releases/download/v2.24.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+          sudo chmod +x /usr/local/bin/docker-compose
+          docker-compose --version
 
       - name: Install protoc plugins
         run: |
@@ -80,23 +86,125 @@ jobs:
           cp test/config/test.yaml configs/config.yaml
           mkdir -p test/output
 
-      - name: Run all tests with comprehensive framework
+      - name: Run fast tests
         run: |
           chmod +x ./test/scripts/run_all.sh
-          ./test/scripts/run_all.sh --all
+          ./test/scripts/run_all.sh --unit-only
+          ./test/scripts/run_all.sh --bdd-only
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db?sslmode=disable
           REDIS_URL: redis://localhost:6379
+          CI: true
+          GITHUB_ACTIONS: true
 
-      - name: Upload test reports
+      - name: Upload fast test reports
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-reports
+          name: fast-test-reports
           path: |
             test/output/
             coverage.out
             coverage.html
+          retention-days: 30
+
+  # 集成测试 - 包括数据库交互测试
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: fast-tests  # 只有快速测试通过才运行集成测试
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.23'
+
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler postgresql-client redis-tools
+          
+          # Install golang-migrate
+          curl -L https://github.com/golang-migrate/migrate/releases/download/v4.16.2/migrate.linux-amd64.tar.gz | tar xvz
+          sudo mv migrate /usr/local/bin/
+
+      - name: Install protoc plugins
+        run: |
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+          go install github.com/go-kratos/kratos/cmd/protoc-gen-go-http/v2@latest
+          go install github.com/google/gnostic/cmd/protoc-gen-openapi@latest
+
+      - name: Get dependencies
+        run: go mod tidy
+
+      - name: Generate proto files
+        run: make all
+
+      - name: Wait for services
+        run: |
+          sleep 10
+          until pg_isready -h localhost -p 5432 -U postgres; do
+            echo "Waiting for postgres..."
+            sleep 2
+          done
+          until redis-cli -h localhost -p 6379 ping; do
+            echo "Waiting for redis..."
+            sleep 2
+          done
+          echo "All services are ready!"
+
+      - name: Run database migrations
+        run: |
+          migrate -path migrations -database "postgresql://postgres:postgres@localhost:5432/test_db?sslmode=disable" up
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db?sslmode=disable
+
+      - name: Run integration tests
+        run: |
+          chmod +x ./test/scripts/run_all.sh
+          ./test/scripts/run_all.sh --integration
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db?sslmode=disable
+          REDIS_URL: redis://localhost:6379
+          CI: true
+          GITHUB_ACTIONS: true
+
+      - name: Upload integration test reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-test-reports
+          path: |
+            test/output/
           retention-days: 30
 
       - name: Upload coverage to Codecov

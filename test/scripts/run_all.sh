@@ -43,6 +43,11 @@ GENERATE_COVERAGE=true
 CLEANUP_AFTER=true
 VERBOSE=false
 
+# CI环境检测
+CI_TYPE="local"
+USE_EXTERNAL_SERVICES=false
+SKIP_DOCKER_SETUP=false
+
 # 解析命令行参数
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -108,9 +113,32 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# 检测CI环境类型
+detect_ci_environment() {
+    if [ "$GITHUB_ACTIONS" = "true" ]; then
+        CI_TYPE="github_actions"
+        USE_EXTERNAL_SERVICES=true
+        SKIP_DOCKER_SETUP=true
+        log_info "检测到GitHub Actions环境"
+    elif [ "$CI" = "true" ]; then
+        CI_TYPE="generic_ci"
+        USE_EXTERNAL_SERVICES=false
+        SKIP_DOCKER_SETUP=false
+        log_info "检测到通用CI环境"
+    else
+        CI_TYPE="local"
+        USE_EXTERNAL_SERVICES=false
+        SKIP_DOCKER_SETUP=false
+        log_info "检测到本地开发环境"
+    fi
+}
+
 # 检查依赖
 check_dependencies() {
     log_info "检查依赖..."
+    
+    # 检测CI环境
+    detect_ci_environment
     
     # 检查Go
     if ! command -v go &> /dev/null; then
@@ -128,14 +156,25 @@ check_dependencies() {
     
     # 检查Docker（如果需要运行集成测试或端到端测试）
     if [ "$RUN_INTEGRATION" = true ] || [ "$RUN_E2E" = true ]; then
-        if ! command -v docker &> /dev/null; then
-            log_error "Docker未安装，集成测试和端到端测试需要Docker"
-            exit 1
+        if [ "$SKIP_DOCKER_SETUP" = false ]; then
+            if ! command -v docker &> /dev/null; then
+                log_error "Docker未安装，集成测试和端到端测试需要Docker"
+                exit 1
+            fi
+            
+            if ! command -v docker-compose &> /dev/null; then
+                log_error "Docker Compose未安装"
+                exit 1
+            fi
+        else
+            log_info "CI环境检测到，使用外部服务，跳过Docker检查"
         fi
-        
-        if ! command -v docker-compose &> /dev/null; then
-            log_error "Docker Compose未安装"
-            exit 1
+    fi
+    
+    # 检查数据库迁移工具（如果需要运行集成测试）
+    if [ "$RUN_INTEGRATION" = true ] && [ "$USE_EXTERNAL_SERVICES" = true ]; then
+        if ! command -v migrate &> /dev/null; then
+            log_warning "migrate工具未安装，集成测试可能需要数据库迁移"
         fi
     fi
     
@@ -157,9 +196,55 @@ setup_test_environment() {
     log_success "测试环境设置完成"
 }
 
+# 等待数据库就绪
+wait_for_database() {
+    if [ "$RUN_INTEGRATION" = true ] && [ "$USE_EXTERNAL_SERVICES" = true ]; then
+        log_info "等待数据库就绪..."
+        
+        local max_attempts=30
+        local attempt=1
+        
+        while [ $attempt -le $max_attempts ]; do
+            if pg_isready -h localhost -p 5432 -U postgres 2>/dev/null; then
+                log_success "数据库已就绪"
+                return 0
+            fi
+            
+            log_info "等待数据库启动... ($attempt/$max_attempts)"
+            sleep 2
+            attempt=$((attempt + 1))
+        done
+        
+        log_error "数据库启动超时"
+        return 1
+    fi
+}
+
+# 运行数据库迁移
+run_migrations() {
+    if [ "$RUN_INTEGRATION" = true ] && [ "$USE_EXTERNAL_SERVICES" = true ]; then
+        log_info "运行数据库迁移..."
+        
+        if command -v migrate &> /dev/null && [ -n "$DATABASE_URL" ]; then
+            cd "$PROJECT_ROOT"
+            migrate -path migrations -database "$DATABASE_URL" up
+            log_success "数据库迁移完成"
+        else
+            log_warning "migrate工具未安装或DATABASE_URL未设置，跳过迁移"
+        fi
+    fi
+}
+
 # 启动测试服务（用于集成测试和端到端测试）
 start_test_services() {
     if [ "$RUN_INTEGRATION" = true ] || [ "$RUN_E2E" = true ]; then
+        if [ "$SKIP_DOCKER_SETUP" = true ]; then
+            log_info "使用外部服务，跳过Docker服务启动"
+            wait_for_database
+            run_migrations
+            return 0
+        fi
+        
         log_info "启动测试服务..."
         
         cd "$TEST_DIR/config"
@@ -262,10 +347,32 @@ run_integration_tests() {
             verbose_flag="-v"
         fi
         
-        # 设置集成测试环境变量
-        export TEST_DATABASE_URL="postgresql://postgres:postgres@localhost:5433/test_db?sslmode=disable"
-        export TEST_REDIS_URL="localhost:6380"
+        # 根据环境设置集成测试环境变量
+        if [ "$USE_EXTERNAL_SERVICES" = true ]; then
+            # CI环境：使用GitHub Actions services
+            export TEST_DATABASE_URL="${DATABASE_URL:-postgresql://postgres:postgres@localhost:5432/test_db?sslmode=disable}"
+            export TEST_REDIS_URL="${REDIS_URL:-redis://localhost:6379}"
+            log_info "使用外部服务进行集成测试"
+            log_info "数据库: $TEST_DATABASE_URL"
+            log_info "Redis: $TEST_REDIS_URL"
+        else
+            # 本地环境：使用Docker Compose服务
+            export TEST_DATABASE_URL="postgresql://postgres:postgres@localhost:5433/test_db?sslmode=disable"
+            export TEST_REDIS_URL="localhost:6380"
+            log_info "使用本地Docker服务进行集成测试"
+        fi
         
+        # 确保数据库连接可用
+        if [ "$USE_EXTERNAL_SERVICES" = true ]; then
+            log_info "验证数据库连接..."
+            if ! pg_isready -h localhost -p 5432 -U postgres 2>/dev/null; then
+                log_error "数据库连接失败"
+                return 1
+            fi
+        fi
+        
+        # 运行集成测试
+        log_info "执行集成测试..."
         if go test $verbose_flag -tags=integration "$TEST_DIR/integration/..."; then
             log_success "集成测试通过"
         else
@@ -305,8 +412,23 @@ cleanup_test_environment() {
         log_info "清理测试环境..."
         
         if [ "$RUN_INTEGRATION" = true ] || [ "$RUN_E2E" = true ]; then
-            cd "$TEST_DIR/config"
-            docker-compose -f docker-compose.test.yml down -v 2>/dev/null || true
+            if [ "$SKIP_DOCKER_SETUP" = false ]; then
+                cd "$TEST_DIR/config"
+                docker-compose -f docker-compose.test.yml down -v 2>/dev/null || true
+                log_info "Docker服务已清理"
+            else
+                log_info "使用外部服务，跳过Docker清理"
+            fi
+        fi
+        
+        # 清理测试数据（如果使用外部服务）
+        if [ "$USE_EXTERNAL_SERVICES" = true ] && [ "$RUN_INTEGRATION" = true ]; then
+            log_info "清理测试数据..."
+            if command -v migrate &> /dev/null && [ -n "$DATABASE_URL" ]; then
+                cd "$PROJECT_ROOT"
+                migrate -path migrations -database "$DATABASE_URL" down -all 2>/dev/null || true
+                log_info "数据库已重置"
+            fi
         fi
         
         log_success "测试环境清理完成"
