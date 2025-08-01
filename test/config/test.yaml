@@ -1,0 +1,41 @@
+# 测试环境配置
+server:
+  http:
+    addr: 0.0.0.0:8000
+    timeout: 1s
+  grpc:
+    addr: 0.0.0.0:9000
+    timeout: 1s
+
+data:
+  database:
+    driver: postgres
+    source: postgresql://postgres:postgres@localhost:5432/test_db?sslmode=disable
+  redis:
+    addr: localhost:6379
+    read_timeout: 0.2s
+    write_timeout: 0.2s
+
+auth:
+  jwt_secret_key: "test-secret-key-for-testing-only"
+  access_token_expiration: "15m"
+  refresh_token_expiration: "168h" # 7 days
+  captcha_enabled: true
+  captcha_expiration: "5m"
+  max_login_attempts: 5
+
+# 测试专用配置
+test:
+  # 在测试环境中使用固定验证码
+  fixed_captcha_code: "123456"
+  # 测试数据库自动清理
+  auto_cleanup: true
+  # 测试超时设置
+  timeout:
+    unit: "30s"
+    integration: "2m"
+    e2e: "5m"
+  # 并发测试设置
+  concurrency:
+    max_goroutines: 10
+    max_operations: 100

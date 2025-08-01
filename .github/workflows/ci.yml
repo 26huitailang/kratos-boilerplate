@@ -1,4 +1,4 @@
-name: Test
+name: CI Tests
 
 on:
   push:
@@ -10,19 +10,44 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
     steps:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.24'
+          go-version: '1.23'
 
       - name: Check out code
         uses: actions/checkout@v4
 
-      - name: Install protoc
+      - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y protobuf-compiler
+          sudo apt-get install -y protobuf-compiler postgresql-client redis-tools
 
       - name: Install protoc plugins
         run: |
@@ -37,37 +62,47 @@ jobs:
       - name: Generate proto files
         run: make all
 
-      - name: Run TDD tests with coverage (go test, exclude service)
+      - name: Wait for services
         run: |
-          go test $(go list ./internal/... | grep -v '/service') -coverprofile=coverage.out
-          go tool cover -func=coverage.out | grep total:
+          sleep 10
+          until pg_isready -h localhost -p 5432 -U postgres; do
+            echo "Waiting for postgres..."
+            sleep 2
+          done
+          until redis-cli -h localhost -p 6379 ping; do
+            echo "Waiting for redis..."
+            sleep 2
+          done
+          echo "All services are ready!"
 
-      - name: Upload TDD coverage report
+      - name: Set up test environment
+        run: |
+          cp test/config/test.yaml configs/config.yaml
+          mkdir -p test/output
+
+      - name: Run all tests with comprehensive framework
+        run: |
+          chmod +x ./test/scripts/run_all.sh
+          ./test/scripts/run_all.sh --all
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db?sslmode=disable
+          REDIS_URL: redis://localhost:6379
+
+      - name: Upload test reports
         uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: coverage-report
-          path: coverage.out
+          name: test-reports
+          path: |
+            test/output/
+            coverage.out
+            coverage.html
+          retention-days: 30
 
-      - name: Generate HTML coverage report
-        run: go tool cover -html=coverage.out -o coverage.html
-
-      - name: Upload HTML coverage report
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-html
-          path: coverage.html
-
-      # BDD测试不关注覆盖率，仅需业务流程通过
-      - name: Install ginkgo CLI
-        run: go install github.com/onsi/ginkgo/v2/ginkgo@latest
-
-      - name: Run BDD tests (ginkgo)
-        run: ginkgo -r ./internal/service
-
-      # 如需上传覆盖率到Codecov，仅上传TDD部分
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v4
+        if: success()
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.out
-          fail_ci_if_error: true 
+          fail_ci_if_error: false
