@@ -4,6 +4,7 @@ package database_test
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -299,10 +300,13 @@ func (suite *AuthIntegrationTestSuite) TestConcurrentOperations() {
 		go func(id int) {
 			defer func() { done <- true }()
 
+			// 为每个goroutine使用唯一的用户名
+			uniqueUsername := fmt.Sprintf("%s_%d", baseUsername, id)
+
 			for j := 0; j < numOperations; j++ {
 				// 保存锁定信息
 				lock := &biz.AccountLock{
-					Username:       baseUsername,
+					Username:       uniqueUsername,
 					FailedAttempts: int32(j + 1),
 					LockUntil:      time.Now().Add(time.Duration(j+1) * time.Minute),
 					LastAttempt:    time.Now(),
@@ -312,7 +316,7 @@ func (suite *AuthIntegrationTestSuite) TestConcurrentOperations() {
 				assert.NoError(suite.T(), err)
 
 				// 获取锁定信息
-				_, err = suite.userRepo.GetLock(suite.ctx, baseUsername)
+				_, err = suite.userRepo.GetLock(suite.ctx, uniqueUsername)
 				assert.NoError(suite.T(), err)
 
 				time.Sleep(10 * time.Millisecond) // 短暂休眠
