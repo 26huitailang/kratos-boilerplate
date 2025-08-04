@@ -54,8 +54,8 @@ func TestUserDatabaseOperations(t *testing.T) {
 			Name:     "测试用户",
 		}
 
-		// 设置mock期望
-		mock.ExpectExec("INSERT INTO users").
+		// 设置mock期望 - 使用ExpectQuery因为CreateUser使用QueryRowContext
+		mock.ExpectQuery("INSERT INTO users").
 			WithArgs(
 				sqlmock.AnyArg(), sqlmock.AnyArg(),
 				sqlmock.AnyArg(), sqlmock.AnyArg(),
@@ -63,7 +63,7 @@ func TestUserDatabaseOperations(t *testing.T) {
 				sqlmock.AnyArg(), sqlmock.AnyArg(),
 				sqlmock.AnyArg(), sqlmock.AnyArg(),
 			).
-			WillReturnResult(sqlmock.NewResult(1, 1))
+			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
 
 		// 执行测试
 		err := userRepo.CreateUser(ctx, user)

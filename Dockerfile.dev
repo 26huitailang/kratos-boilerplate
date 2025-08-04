@@ -42,9 +42,9 @@ ENV GOROOT=/usr/local/go
 ENV GOPATH=/go
 ENV PATH=$PATH:$GOPATH/bin
 
-# 创建工作目录并设置权限
+# 创建工作目录和 Go 工作空间
 WORKDIR /app
-RUN chown -R dev:dev /app /go
+RUN mkdir -p /go && chown -R dev:dev /app /go
 
 # 安装开发工具
 RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest && \
@@ -68,4 +68,4 @@ COPY --chmod=755 <<EOF /start.sh
 exec tail -f /dev/null
 EOF
 
-CMD ["/start.sh"] 
+CMD ["/start.sh"]

@@ -30,7 +30,8 @@ type AuthIntegrationTestSuite struct {
 
 // SetupSuite 在测试套件开始前执行
 func (suite *AuthIntegrationTestSuite) SetupSuite() {
-	suite.logger = log.NewStdLogger(suite.T().Logf)
+	// 创建日志器，直接使用标准输出
+	suite.logger = log.NewStdLogger(os.Stdout)
 	suite.ctx = context.Background()
 
 	// 从环境变量获取数据库配置
@@ -224,19 +225,19 @@ func (suite *AuthIntegrationTestSuite) TestRefreshToken() {
 	assert.NoError(suite.T(), err)
 
 	// 获取刷新令牌
-	retrievedUsername, valid, err := suite.userRepo.GetRefreshToken(suite.ctx, tokenID)
+	retrievedUsername, used, err := suite.userRepo.GetRefreshToken(suite.ctx, tokenID)
 	assert.NoError(suite.T(), err)
-	assert.True(suite.T(), valid)
+	assert.False(suite.T(), used) // 新创建的令牌应该是未使用的
 	assert.Equal(suite.T(), username, retrievedUsername)
 
 	// 使令牌无效
 	err = suite.userRepo.InvalidateRefreshToken(suite.ctx, tokenID)
 	assert.NoError(suite.T(), err)
 
-	// 验证令牌已无效
-	_, valid, err = suite.userRepo.GetRefreshToken(suite.ctx, tokenID)
+	// 验证令牌已被标记为已使用
+	_, used, err = suite.userRepo.GetRefreshToken(suite.ctx, tokenID)
 	assert.NoError(suite.T(), err)
-	assert.False(suite.T(), valid)
+	assert.True(suite.T(), used) // 无效化后的令牌应该被标记为已使用
 }
 
 // TestCaptcha 测试验证码功能
