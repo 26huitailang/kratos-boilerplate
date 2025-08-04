@@ -78,14 +78,15 @@ func (r *userRepo) CreateUser(ctx context.Context, u *biz.User) error {
 			name_encrypted, name_hash,
 			created_at, updated_at
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		RETURNING id
 	`
-	_, err = r.data.db.ExecContext(ctx, query,
+	err = r.data.db.QueryRowContext(ctx, query,
 		u.Username, u.Password,
 		emailEnc, emailHash,
 		phoneEnc, phoneHash,
 		nameEnc, nameHash,
 		time.Now(), time.Now(),
-	)
+	).Scan(&u.ID)
 	return err
 }
 
@@ -345,6 +346,7 @@ func (r *userRepo) GetRefreshToken(ctx context.Context, tokenID string) (string,
 		return "", false, fmt.Errorf("刷新令牌已过期")
 	}
 
+	// 返回用户名和令牌是否已被使用
 	return info.username, info.used, nil
 }
 
