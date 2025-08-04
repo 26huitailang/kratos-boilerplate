@@ -227,8 +227,8 @@ func TestUserDatabaseOperations(t *testing.T) {
 			Name:     "重复用户",
 		}
 		expectedErr := fmt.Errorf("duplicate key value violates unique constraint")
-		// 设置mock期望 - 重复用户名错误
-		mock.ExpectExec("INSERT INTO users").
+		// 设置mock期望 - 重复用户名错误，使用ExpectQuery因为CreateUser使用QueryRowContext
+		mock.ExpectQuery("INSERT INTO users").
 			WithArgs(
 				sqlmock.AnyArg(), sqlmock.AnyArg(),
 				sqlmock.AnyArg(), sqlmock.AnyArg(),
