@@ -12,6 +12,7 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 // 验证repo实现了biz.UserRepo接口
@@ -22,8 +23,8 @@ func TestNewUserRepo(t *testing.T) {
 	logger := log.NewStdLogger(os.Stdout)
 	data := &Data{}
 
-	repo, err := NewUserRepo(data, logger)
-
+	kmsManager := &mockKMSManager{}
+	repo, err := NewUserRepo(data, logger, kmsManager)
 	assert.NoError(t, err)
 	assert.NotNil(t, repo)
 }
@@ -88,8 +89,9 @@ func TestInMemoryStorage(t *testing.T) {
 	logger := log.NewStdLogger(os.Stdout)
 	data := &Data{}
 
-	repo, err := NewUserRepo(data, logger)
-	assert.NoError(t, err)
+	kmsManager := &mockKMSManager{}
+	repo, err := NewUserRepo(data, logger, kmsManager)
+	require.NoError(t, err)
 
 	userRepo := repo.(*userRepo)
 	ctx := context.Background()

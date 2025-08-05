@@ -3,12 +3,15 @@ package data
 import (
 	"context"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
 	"kratos-boilerplate/internal/biz"
 	"kratos-boilerplate/internal/pkg/crypto"
+	"kratos-boilerplate/internal/pkg/kms"
 
 	"github.com/go-kratos/kratos/v2/log"
 )
@@ -17,6 +20,7 @@ type userRepo struct {
 	data *Data
 	log  *log.Helper
 	enc  crypto.Encryptor
+	kms  kms.KMSManager // KMS管理器
 
 	// 内存存储验证码和账户锁定信息（实际项目应使用Redis等缓存）
 	captchas      sync.Map // map[captchaID]*biz.Captcha
@@ -32,22 +36,75 @@ type refreshTokenInfo struct {
 }
 
 // NewUserRepo .
-func NewUserRepo(data *Data, logger log.Logger) (biz.UserRepo, error) {
-	// 这里使用一个固定的密钥，实际应用中应该从配置或环境变量中获取
-	key := make([]byte, 32)
-	copy(key, []byte("your-secret-key-for-encryption-123"))
+func NewUserRepo(data *Data, logger log.Logger, kmsManager kms.KMSManager) (biz.UserRepo, error) {
+	// 使用KMS系统获取加密服务
+	cryptoService := kmsManager.GetCryptoService()
 
-	// 默认使用AES-GCM算法
-	enc, err := crypto.NewEncryptor(crypto.AlgoAESGCM, key)
-	if err != nil {
-		return nil, err
+	// 创建兼容的加密器包装
+	enc := &kmsEncryptorWrapper{
+		cryptoService: cryptoService,
 	}
 
 	return &userRepo{
 		data: data,
 		log:  log.NewHelper(logger),
 		enc:  enc,
+		kms:  kmsManager,
 	}, nil
+}
+
+// kmsEncryptorWrapper KMS加密器包装，实现crypto.Encryptor接口
+type kmsEncryptorWrapper struct {
+	cryptoService kms.CryptoService
+}
+
+// Encrypt 加密数据
+func (w *kmsEncryptorWrapper) Encrypt(data []byte) ([]byte, error) {
+	encryptedField, err := w.cryptoService.EncryptField(context.Background(), "user_data", data)
+	if err != nil {
+		return nil, err
+	}
+
+	// 将加密结果序列化为字节数组
+	// 这里简化处理，实际应该使用更完善的序列化方式
+	return []byte(fmt.Sprintf("%s:%s:%x", encryptedField.EncryptedData.KeyVersion, encryptedField.EncryptedData.Algorithm, encryptedField.EncryptedData.Ciphertext)), nil
+}
+
+// Decrypt 解密数据
+func (w *kmsEncryptorWrapper) Decrypt(data []byte) ([]byte, error) {
+	// 解析加密数据格式
+	parts := strings.Split(string(data), ":")
+	if len(parts) != 3 {
+		return nil, fmt.Errorf("invalid encrypted data format")
+	}
+
+	// 将十六进制字符串转换回字节数组
+	ciphertext, err := hex.DecodeString(parts[2])
+	if err != nil {
+		return nil, fmt.Errorf("invalid ciphertext format: %w", err)
+	}
+
+	encryptedField := &kms.EncryptedField{
+		FieldName: "user_data",
+		EncryptedData: &kms.EncryptedData{
+			KeyVersion: parts[0],
+			Algorithm:  parts[1],
+			Ciphertext: ciphertext,
+		},
+	}
+
+	decrypted, err := w.cryptoService.DecryptField(context.Background(), encryptedField)
+	if err != nil {
+		return nil, err
+	}
+
+	return decrypted, nil
+}
+
+// Hash 计算哈希值
+func (w *kmsEncryptorWrapper) Hash(data []byte) string {
+	hash := w.cryptoService.HashField(data)
+	return hash
 }
 
 func (r *userRepo) CreateUser(ctx context.Context, u *biz.User) error {

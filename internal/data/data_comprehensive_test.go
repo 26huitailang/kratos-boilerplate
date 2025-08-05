@@ -51,7 +51,8 @@ func TestUserRepoCreation(t *testing.T) {
 	logger := log.NewStdLogger(os.Stdout)
 	data := &Data{}
 
-	repo, err := NewUserRepo(data, logger)
+	kmsManager := &mockKMSManager{}
+	repo, err := NewUserRepo(data, logger, kmsManager)
 	require.NoError(t, err)
 	assert.NotNil(t, repo)
 
@@ -151,8 +152,9 @@ func TestUserRepoInterfaceMethods(t *testing.T) {
 	logger := log.NewStdLogger(os.Stdout)
 	data := &Data{}
 
-	repo, err := NewUserRepo(data, logger)
-	require.NoError(t, err)
+	kmsManager := &mockKMSManager{}
+		repo, err := NewUserRepo(data, logger, kmsManager)
+		require.NoError(t, err)
 
 	userRepo := repo.(*userRepo)
 
@@ -266,10 +268,11 @@ func TestConcurrency(t *testing.T) {
 	logger := log.NewStdLogger(os.Stdout)
 	data := &Data{}
 
-	repo, err := NewUserRepo(data, logger)
-	require.NoError(t, err)
+	kmsManager := &mockKMSManager{}
+		repo, err := NewUserRepo(data, logger, kmsManager)
+		require.NoError(t, err)
 
-	userRepo := repo.(*userRepo)
+		userRepo := repo.(*userRepo)
 	ctx := context.Background()
 
 	// 并发测试

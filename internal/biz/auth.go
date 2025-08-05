@@ -11,6 +11,8 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/golang-jwt/jwt/v4"
 	"golang.org/x/crypto/bcrypt"
+
+	"kratos-boilerplate/internal/pkg/sensitive"
 )
 
 var (
@@ -40,6 +42,66 @@ type User struct {
 	TotpSecret string // TOTP 密钥
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
+}
+
+// GetSensitiveFields 获取敏感字段列表
+func (u *User) GetSensitiveFields() []string {
+	return []string{"email", "phone", "name", "password", "totp_secret"}
+}
+
+// Anonymize 脱敏处理
+func (u *User) Anonymize() interface{} {
+	if u == nil {
+		return nil
+	}
+
+	// 获取脱敏规则
+	rules := u.GetAnonymizeRules()
+	anonymizer := sensitive.NewAnonymizer()
+
+	return map[string]interface{}{
+		"id":          u.ID,
+		"username":    u.Username,   // 用户名不脱敏
+		"password":    "[REDACTED]", // 密码完全隐藏
+		"email":       anonymizer.AnonymizeString(u.Email, rules["email"]),
+		"phone":       anonymizer.AnonymizeString(u.Phone, rules["phone"]),
+		"name":        anonymizer.AnonymizeString(u.Name, rules["name"]),
+		"totp_secret": "[REDACTED]", // TOTP密钥完全隐藏
+		"created_at":  u.CreatedAt,
+		"updated_at":  u.UpdatedAt,
+	}
+}
+
+// GetAnonymizeRules 获取脱敏规则
+func (u *User) GetAnonymizeRules() map[string]sensitive.AnonymizeRule {
+	rules := sensitive.GetDefaultRules()
+
+	// 可以根据需要自定义规则
+	rules["password"] = sensitive.AnonymizeRule{
+		FieldName: "password",
+		CustomFunc: func(string) string {
+			return "[REDACTED]"
+		},
+	}
+
+	rules["totp_secret"] = sensitive.AnonymizeRule{
+		FieldName: "totp_secret",
+		CustomFunc: func(string) string {
+			return "[REDACTED]"
+		},
+	}
+
+	return rules
+}
+
+// LogSafeString 实现LogSafeStringer接口
+func (u *User) LogSafeString() string {
+	if u == nil {
+		return "<nil>"
+	}
+
+	anonymized := u.Anonymize()
+	return fmt.Sprintf("%+v", anonymized)
 }
 
 // UserInfo 用户信息（匿名化后的）

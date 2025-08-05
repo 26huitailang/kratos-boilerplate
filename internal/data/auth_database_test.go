@@ -2,9 +2,12 @@ package data
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -15,6 +18,7 @@ import (
 
 	"kratos-boilerplate/internal/biz"
 	"kratos-boilerplate/internal/pkg/crypto"
+	"kratos-boilerplate/internal/pkg/kms"
 )
 
 // 测试用户数据库操作
@@ -24,22 +28,28 @@ func TestUserDatabaseOperations(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 
-	// 创建加密器
-	key := make([]byte, 32)
-	copy(key, []byte("test-key-32-bytes-long-key!!"))
-	encryptor, err := crypto.NewEncryptor(crypto.AlgoAESGCM, key)
-	require.NoError(t, err)
-
 	// 创建数据层
 	data := &Data{
 		db:    db,
 		redis: nil, // 不需要Redis
 	}
 
+	// 创建mock加密服务
+	mockCrypto := &mockCryptoService{}
+
 	// 创建用户仓储
 	logger := log.NewStdLogger(os.Stdout)
-	userRepo, err := NewUserRepo(data, logger)
-	require.NoError(t, err)
+	// 创建模拟的KMS管理器
+	kmsManager := &mockKMSManager{}
+	userRepo := &userRepo{
+		data: data,
+		log:  log.NewHelper(logger),
+		enc:  mockCrypto, // 直接使用mock加密服务
+		kms:  kmsManager,
+		captchas:     sync.Map{},
+		accountLocks: sync.Map{},
+		refreshTokens: sync.Map{},
+	}
 
 	ctx := context.Background()
 
@@ -85,10 +95,13 @@ func TestUserDatabaseOperations(t *testing.T) {
 			Name:     "测试用户",
 		}
 
-		// 简化：直接使用空字节数组，避免加密/解密复杂性
-		// 实际测试中，我们主要关注SQL执行和错误处理
+		// 设置mock期望 - 返回有效的加密数据
+		encryptedEmail := []byte("encrypted_email_data")
+		encryptedPhone := []byte("encrypted_phone_data")
+		encryptedName := []byte("encrypted_name_data")
+		
 		rows := sqlmock.NewRows([]string{"id", "username", "password", "email_encrypted", "phone_encrypted", "name_encrypted", "created_at", "updated_at"}).
-			AddRow(expectedUser.ID, expectedUser.Username, expectedUser.Password, []byte{}, []byte{}, []byte{}, time.Now(), time.Now())
+			AddRow(expectedUser.ID, expectedUser.Username, expectedUser.Password, encryptedEmail, encryptedPhone, encryptedName, time.Now(), time.Now())
 
 		mock.ExpectQuery("SELECT (.+) FROM users").
 			WithArgs(username).
@@ -96,10 +109,13 @@ func TestUserDatabaseOperations(t *testing.T) {
 
 		// 执行测试
 		user, err := userRepo.GetUser(ctx, username)
-		// 由于加密数据为空，解密会失败，但我们主要测试SQL执行
-		// 实际项目中，这里应该返回有效的加密数据
-		assert.Error(t, err) // 期望解密失败
-		assert.Nil(t, user)
+		// 现在应该成功解密
+		assert.NoError(t, err)
+		assert.NotNil(t, user)
+		assert.Equal(t, expectedUser.Username, user.Username)
+		assert.Equal(t, "test@example.com", user.Email)
+		assert.Equal(t, "13800138000", user.Phone)
+		assert.Equal(t, "测试用户", user.Name)
 
 		assert.NoError(t, mock.ExpectationsWereMet()) // 后置清理
 	})
@@ -128,10 +144,19 @@ func TestUserDatabaseOperations(t *testing.T) {
 					Name:     "测试用户",
 				}
 
-				// 加密数据
-				encryptedEmail, _ := encryptor.Encrypt([]byte(expectedUser.Email))
-				encryptedPhone, _ := encryptor.Encrypt([]byte(expectedUser.Phone))
-				encryptedName, _ := encryptor.Encrypt([]byte(expectedUser.Name))
+				// 使用mock加密服务生成加密数据
+				mockCrypto := &mockCryptoService{}
+				encryptedEmailField, _ := mockCrypto.EncryptField(ctx, "email", []byte(expectedUser.Email))
+				encryptedPhoneField, _ := mockCrypto.EncryptField(ctx, "phone", []byte(expectedUser.Phone))
+				encryptedNameField, _ := mockCrypto.EncryptField(ctx, "name", []byte(expectedUser.Name))
+				
+				// 序列化加密数据为字节数组（简化处理）
+				encryptedEmail := []byte("encrypted_email_data")
+				encryptedPhone := []byte("encrypted_phone_data")
+				encryptedName := []byte("encrypted_name_data")
+				_ = encryptedEmailField
+				_ = encryptedPhoneField
+				_ = encryptedNameField
 
 				rows := sqlmock.NewRows([]string{"id", "username", "password", "email_encrypted", "phone_encrypted", "name_encrypted", "created_at", "updated_at"}).
 					AddRow(expectedUser.ID, expectedUser.Username, expectedUser.Password, encryptedEmail, encryptedPhone, encryptedName, time.Now(), time.Now())
@@ -139,11 +164,11 @@ func TestUserDatabaseOperations(t *testing.T) {
 				var hash string
 				switch tt.queryType {
 				case "email":
-					hash = encryptor.Hash([]byte(tt.input))
+					hash = mockCrypto.HashField([]byte(tt.input))
 				case "phone":
-					hash = encryptor.Hash([]byte(tt.input))
+					hash = mockCrypto.HashField([]byte(tt.input))
 				case "name":
-					hash = encryptor.Hash([]byte(tt.input))
+					hash = mockCrypto.HashField([]byte(tt.input))
 				}
 
 				mock.ExpectQuery("SELECT (.+) FROM users").
@@ -160,9 +185,10 @@ func TestUserDatabaseOperations(t *testing.T) {
 				case "name":
 					user, err = userRepo.GetUserByName(ctx, tt.input)
 				}
-				// 由于加密数据为空，解密会失败，但我们主要测试SQL执行
-				assert.Error(t, err) // 期望解密失败
-				assert.Nil(t, user)
+				// 由于使用了mock加密服务，应该能成功解密
+				assert.NoError(t, err)
+				assert.NotNil(t, user)
+				assert.Equal(t, expectedUser.Username, user.Username)
 
 				assert.NoError(t, mock.ExpectationsWereMet()) // 后置清理
 			})
@@ -243,4 +269,136 @@ func TestUserDatabaseOperations(t *testing.T) {
 		assert.Equal(t, expectedErr, err)
 		assert.NoError(t, mock.ExpectationsWereMet()) // 后置清理
 	})
+}
+
+// mockKMSManager 是用于测试的模拟KMS管理器
+type mockKMSManager struct{}
+
+func (m *mockKMSManager) Initialize(ctx context.Context, config *kms.Config) error {
+	return nil
+}
+
+func (m *mockKMSManager) GetActiveDataKey(ctx context.Context) (*kms.DataKey, error) {
+	return &kms.DataKey{
+		ID:        "test-key-id",
+		Version:   "v1",
+		Algorithm: "AES-GCM-256",
+		Key:       []byte("0123456789abcdef0123456789abcdef"),
+		IsActive:  true,
+	}, nil
+}
+
+func (m *mockKMSManager) GetDataKeyByVersion(ctx context.Context, version string) (*kms.DataKey, error) {
+	return &kms.DataKey{
+		ID:        "test-key-id",
+		Version:   version,
+		Algorithm: "AES-GCM-256",
+		Key:       []byte("0123456789abcdef0123456789abcdef"),
+		IsActive:  true,
+	}, nil
+}
+
+func (m *mockKMSManager) RotateDataKey(ctx context.Context) (*kms.DataKey, error) {
+	return &kms.DataKey{
+		ID:        "test-key-id",
+		Version:   "v2",
+		Algorithm: "AES-GCM-256",
+		Key:       []byte("0123456789abcdef0123456789abcdef"),
+		IsActive:  true,
+	}, nil
+}
+
+func (m *mockKMSManager) GetCryptoService() kms.CryptoService {
+	return &mockCryptoService{}
+}
+
+func (m *mockKMSManager) Close() error {
+	return nil
+}
+
+// mockCryptoService 是用于测试的模拟加密服务
+type mockCryptoService struct{}
+
+// 确保mockCryptoService实现了crypto.Encryptor接口
+var _ crypto.Encryptor = (*mockCryptoService)(nil)
+
+func (m *mockCryptoService) EncryptField(ctx context.Context, fieldName string, plaintext []byte) (*kms.EncryptedField, error) {
+	return &kms.EncryptedField{
+		FieldName: fieldName,
+		EncryptedData: &kms.EncryptedData{
+			KeyVersion: "v1",
+			Algorithm:  "AES-256-GCM",
+			Ciphertext: plaintext, // 简化测试，直接返回明文
+		},
+		Hash: "mock-hash",
+	}, nil
+}
+
+func (m *mockCryptoService) DecryptField(ctx context.Context, encryptedField *kms.EncryptedField) ([]byte, error) {
+	return encryptedField.EncryptedData.Ciphertext, nil // 简化测试，直接返回密文
+}
+
+// 为了兼容旧的crypto接口，添加Decrypt方法
+func (m *mockCryptoService) Decrypt(data []byte) ([]byte, error) {
+	// 简化处理：根据加密数据返回对应的明文
+	switch string(data) {
+	case "encrypted_email_data":
+		return []byte("test@example.com"), nil
+	case "encrypted_phone_data":
+		return []byte("13800138000"), nil
+	case "encrypted_name_data":
+		return []byte("测试用户"), nil
+	default:
+		return data, nil // 如果不是我们的测试数据，直接返回
+	}
+}
+
+// 为了兼容旧的crypto接口，添加Hash方法
+func (m *mockCryptoService) Hash(data []byte) string {
+	return m.HashField(data)
+}
+
+// 为了兼容crypto.Encryptor接口，添加Encrypt方法
+func (m *mockCryptoService) Encrypt(data []byte) ([]byte, error) {
+	// 简化处理：根据明文返回对应的加密数据
+	switch string(data) {
+	case "test@example.com":
+		return []byte("encrypted_email_data"), nil
+	case "13800138000":
+		return []byte("encrypted_phone_data"), nil
+	case "测试用户":
+		return []byte("encrypted_name_data"), nil
+	default:
+		return []byte("encrypted_" + string(data)), nil
+	}
+}
+
+func (m *mockCryptoService) HashField(data []byte) string {
+	// 使用简单的hash算法来模拟，确保与测试期望一致
+	h := sha256.Sum256(data)
+	return hex.EncodeToString(h[:])
+}
+
+func (m *mockCryptoService) EncryptBatch(ctx context.Context, fields map[string][]byte) (map[string]*kms.EncryptedField, error) {
+	result := make(map[string]*kms.EncryptedField)
+	for fieldName, data := range fields {
+		result[fieldName] = &kms.EncryptedField{
+			FieldName: fieldName,
+			EncryptedData: &kms.EncryptedData{
+				KeyVersion: "v1",
+				Algorithm:  "AES-256-GCM",
+				Ciphertext: data,
+			},
+			Hash: "mock-hash",
+		}
+	}
+	return result, nil
+}
+
+func (m *mockCryptoService) DecryptBatch(ctx context.Context, encryptedFields map[string]*kms.EncryptedField) (map[string][]byte, error) {
+	result := make(map[string][]byte)
+	for fieldName, encryptedField := range encryptedFields {
+		result[fieldName] = encryptedField.EncryptedData.Ciphertext
+	}
+	return result, nil
 }

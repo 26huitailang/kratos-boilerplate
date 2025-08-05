@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"kratos-boilerplate/internal/conf"
 	"kratos-boilerplate/internal/pkg/captcha"
+	"kratos-boilerplate/internal/pkg/kms"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/wire"
@@ -13,7 +14,7 @@ import (
 )
 
 // ProviderSet is data providers.
-var ProviderSet = wire.NewSet(NewData, NewGreeterRepo, NewUserRepo, NewOperationLogRepo, NewCaptchaRepo, captcha.NewCaptchaService, NewCaptchaConfig)
+var ProviderSet = wire.NewSet(NewData, NewGreeterRepo, NewUserRepo, NewOperationLogRepo, NewCaptchaRepo, captcha.NewCaptchaService, NewCaptchaConfig, NewKMSManager)
 
 // Data .
 type Data struct {
@@ -67,4 +68,14 @@ func NewCaptchaConfig(auth *conf.Auth) *captcha.Config {
 		EnableImage: auth.CaptchaEnabled,
 		Expiration:  auth.CaptchaExpiration.AsDuration(),
 	}
+}
+
+// GetDB 获取数据库连接
+func (d *Data) GetDB() *sql.DB {
+	return d.db
+}
+
+// NewKMSManager 创建KMS管理器
+func NewKMSManager(data *Data, logger log.Logger) kms.KMSManager {
+	return kms.NewKMSManager(data.db, logger)
 }

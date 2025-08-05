@@ -17,8 +17,9 @@ import (
 func TestNewUserRepoSimple(t *testing.T) {
 	logger := log.NewStdLogger(os.Stdout)
 	data := &Data{}
+	kmsManager := &mockKMSManager{}
 
-	repo, err := NewUserRepo(data, logger)
+	repo, err := NewUserRepo(data, logger, kmsManager)
 
 	require.NoError(t, err)
 	assert.NotNil(t, repo)
@@ -28,8 +29,9 @@ func TestNewUserRepoSimple(t *testing.T) {
 func TestCaptchaOperations(t *testing.T) {
 	logger := log.NewStdLogger(os.Stdout)
 	data := &Data{}
+	kmsManager := &mockKMSManager{}
 
-	repo, err := NewUserRepo(data, logger)
+	repo, err := NewUserRepo(data, logger, kmsManager)
 	require.NoError(t, err)
 
 	userRepo := repo.(*userRepo)
@@ -101,8 +103,9 @@ func TestCaptchaOperations(t *testing.T) {
 func TestRefreshTokenExpiredSimple(t *testing.T) {
 	logger := log.NewStdLogger(os.Stdout)
 	data := &Data{}
+	kmsManager := &mockKMSManager{}
 
-	repo, err := NewUserRepo(data, logger)
+	repo, err := NewUserRepo(data, logger, kmsManager)
 	require.NoError(t, err)
 
 	userRepo := repo.(*userRepo)
@@ -123,8 +126,9 @@ func TestRefreshTokenExpiredSimple(t *testing.T) {
 func TestInvalidateAllRefreshTokensSimple(t *testing.T) {
 	logger := log.NewStdLogger(os.Stdout)
 	data := &Data{}
+	kmsManager := &mockKMSManager{}
 
-	repo, err := NewUserRepo(data, logger)
+	repo, err := NewUserRepo(data, logger, kmsManager)
 	require.NoError(t, err)
 
 	userRepo := repo.(*userRepo)
@@ -164,8 +168,9 @@ func TestInvalidateAllRefreshTokensSimple(t *testing.T) {
 func TestGetCaptchaNotFound(t *testing.T) {
 	logger := log.NewStdLogger(os.Stdout)
 	data := &Data{}
+	kmsManager := &mockKMSManager{}
 
-	repo, err := NewUserRepo(data, logger)
+	repo, err := NewUserRepo(data, logger, kmsManager)
 	require.NoError(t, err)
 
 	userRepo := repo.(*userRepo)
@@ -181,8 +186,9 @@ func TestGetCaptchaNotFound(t *testing.T) {
 func TestMarkCaptchaUsedNotFound(t *testing.T) {
 	logger := log.NewStdLogger(os.Stdout)
 	data := &Data{}
+	kmsManager := &mockKMSManager{}
 
-	repo, err := NewUserRepo(data, logger)
+	repo, err := NewUserRepo(data, logger, kmsManager)
 	require.NoError(t, err)
 
 	userRepo := repo.(*userRepo)
@@ -198,8 +204,9 @@ func TestMarkCaptchaUsedNotFound(t *testing.T) {
 func TestGetLockNotFound(t *testing.T) {
 	logger := log.NewStdLogger(os.Stdout)
 	data := &Data{}
+	kmsManager := &mockKMSManager{}
 
-	repo, err := NewUserRepo(data, logger)
+	repo, err := NewUserRepo(data, logger, kmsManager)
 	require.NoError(t, err)
 
 	userRepo := repo.(*userRepo)
@@ -214,8 +221,9 @@ func TestGetLockNotFound(t *testing.T) {
 func TestGetRefreshTokenNotFound(t *testing.T) {
 	logger := log.NewStdLogger(os.Stdout)
 	data := &Data{}
+	kmsManager := &mockKMSManager{}
 
-	repo, err := NewUserRepo(data, logger)
+	repo, err := NewUserRepo(data, logger, kmsManager)
 	require.NoError(t, err)
 
 	userRepo := repo.(*userRepo)
@@ -231,8 +239,9 @@ func TestGetRefreshTokenNotFound(t *testing.T) {
 func TestInvalidateRefreshTokenNotFound(t *testing.T) {
 	logger := log.NewStdLogger(os.Stdout)
 	data := &Data{}
+	kmsManager := &mockKMSManager{}
 
-	repo, err := NewUserRepo(data, logger)
+	repo, err := NewUserRepo(data, logger, kmsManager)
 	require.NoError(t, err)
 
 	userRepo := repo.(*userRepo)

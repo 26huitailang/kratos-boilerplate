@@ -81,8 +81,11 @@ func (ts *TestSuite) SetupWithRealData(dataConfig *conf.Data) error {
 		return fmt.Errorf("failed to setup data layer: %w", err)
 	}
 
+	// 创建KMS管理器（测试环境使用简单配置）
+	kmsManager := data.NewKMSManager(ts.Data, ts.Logger)
+
 	// 创建仓储
-	userRepo, err := data.NewUserRepo(ts.Data, ts.Logger)
+	userRepo, err := data.NewUserRepo(ts.Data, ts.Logger, kmsManager)
 	if err != nil {
 		return fmt.Errorf("failed to create user repo: %w", err)
 	}
