@@ -3,6 +3,8 @@ package data
 import (
 	"database/sql"
 	"fmt"
+	"time"
+	"kratos-boilerplate/internal/biz"
 	"kratos-boilerplate/internal/conf"
 	"kratos-boilerplate/internal/pkg/captcha"
 	"kratos-boilerplate/internal/pkg/kms"
@@ -14,7 +16,7 @@ import (
 )
 
 // ProviderSet is data providers.
-var ProviderSet = wire.NewSet(NewData, NewGreeterRepo, NewUserRepo, NewOperationLogRepo, NewCaptchaRepo, captcha.NewCaptchaService, NewCaptchaConfig, NewKMSManager)
+var ProviderSet = wire.NewSet(NewData, NewGreeterRepo, NewUserRepo, NewOperationLogRepo, NewCaptchaRepo, captcha.NewCaptchaService, NewCaptchaConfig, NewKMSRepo, NewKMSManager)
 
 // Data .
 type Data struct {
@@ -75,7 +77,18 @@ func (d *Data) GetDB() *sql.DB {
 	return d.db
 }
 
+
+
 // NewKMSManager 创建KMS管理器
-func NewKMSManager(data *Data, logger log.Logger) kms.KMSManager {
-	return kms.NewKMSManager(data.db, logger)
+func NewKMSManager(kmsRepo biz.KMSRepo, logger log.Logger) kms.KMSManager {
+	// 创建默认配置
+	config := &biz.KMSConfig{
+		Seed:             "default-seed-value",
+		Salt:             "default-salt-value",
+		Iterations:       100000,
+		KeyLength:        32,
+		RotateInterval: 24 * time.Hour, // 24小时
+		Algorithm:        "AES-256-GCM",
+	}
+	return kms.NewKMSManager(kmsRepo, config, logger)
 }

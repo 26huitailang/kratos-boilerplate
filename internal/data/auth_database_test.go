@@ -274,12 +274,12 @@ func TestUserDatabaseOperations(t *testing.T) {
 // mockKMSManager 是用于测试的模拟KMS管理器
 type mockKMSManager struct{}
 
-func (m *mockKMSManager) Initialize(ctx context.Context, config *kms.Config) error {
+func (m *mockKMSManager) Initialize(ctx context.Context, config *biz.KMSConfig) error {
 	return nil
 }
 
-func (m *mockKMSManager) GetActiveDataKey(ctx context.Context) (*kms.DataKey, error) {
-	return &kms.DataKey{
+func (m *mockKMSManager) GetActiveDataKey(ctx context.Context) (*biz.DataKey, error) {
+	return &biz.DataKey{
 		ID:        "test-key-id",
 		Version:   "v1",
 		Algorithm: "AES-GCM-256",
@@ -288,8 +288,8 @@ func (m *mockKMSManager) GetActiveDataKey(ctx context.Context) (*kms.DataKey, er
 	}, nil
 }
 
-func (m *mockKMSManager) GetDataKeyByVersion(ctx context.Context, version string) (*kms.DataKey, error) {
-	return &kms.DataKey{
+func (m *mockKMSManager) GetDataKeyByVersion(ctx context.Context, version string) (*biz.DataKey, error) {
+	return &biz.DataKey{
 		ID:        "test-key-id",
 		Version:   version,
 		Algorithm: "AES-GCM-256",
@@ -298,8 +298,8 @@ func (m *mockKMSManager) GetDataKeyByVersion(ctx context.Context, version string
 	}, nil
 }
 
-func (m *mockKMSManager) RotateDataKey(ctx context.Context) (*kms.DataKey, error) {
-	return &kms.DataKey{
+func (m *mockKMSManager) RotateDataKey(ctx context.Context) (*biz.DataKey, error) {
+	return &biz.DataKey{
 		ID:        "test-key-id",
 		Version:   "v2",
 		Algorithm: "AES-GCM-256",
@@ -322,20 +322,16 @@ type mockCryptoService struct{}
 // 确保mockCryptoService实现了crypto.Encryptor接口
 var _ crypto.Encryptor = (*mockCryptoService)(nil)
 
-func (m *mockCryptoService) EncryptField(ctx context.Context, fieldName string, plaintext []byte) (*kms.EncryptedField, error) {
-	return &kms.EncryptedField{
-		FieldName: fieldName,
-		EncryptedData: &kms.EncryptedData{
-			KeyVersion: "v1",
-			Algorithm:  "AES-256-GCM",
-			Ciphertext: plaintext, // 简化测试，直接返回明文
-		},
-		Hash: "mock-hash",
+func (m *mockCryptoService) EncryptField(ctx context.Context, fieldName string, plaintext []byte) (*biz.EncryptedField, error) {
+	return &biz.EncryptedField{
+		Value: plaintext, // 简化测试
+		Version: "v1",
+		Algorithm: "AES-256-GCM",
 	}, nil
 }
 
-func (m *mockCryptoService) DecryptField(ctx context.Context, encryptedField *kms.EncryptedField) ([]byte, error) {
-	return encryptedField.EncryptedData.Ciphertext, nil // 简化测试，直接返回密文
+func (m *mockCryptoService) DecryptField(ctx context.Context, encryptedField *biz.EncryptedField) ([]byte, error) {
+	return encryptedField.Value, nil // 简化测试，直接返回值
 }
 
 // 为了兼容旧的crypto接口，添加Decrypt方法
@@ -379,26 +375,22 @@ func (m *mockCryptoService) HashField(data []byte) string {
 	return hex.EncodeToString(h[:])
 }
 
-func (m *mockCryptoService) EncryptBatch(ctx context.Context, fields map[string][]byte) (map[string]*kms.EncryptedField, error) {
-	result := make(map[string]*kms.EncryptedField)
+func (m *mockCryptoService) EncryptBatch(ctx context.Context, fields map[string][]byte) (map[string]*biz.EncryptedField, error) {
+	result := make(map[string]*biz.EncryptedField)
 	for fieldName, data := range fields {
-		result[fieldName] = &kms.EncryptedField{
-			FieldName: fieldName,
-			EncryptedData: &kms.EncryptedData{
-				KeyVersion: "v1",
-				Algorithm:  "AES-256-GCM",
-				Ciphertext: data,
-			},
-			Hash: "mock-hash",
+		result[fieldName] = &biz.EncryptedField{
+			Value: data,
+			Version: "v1",
+			Algorithm: "AES-256-GCM",
 		}
 	}
 	return result, nil
 }
 
-func (m *mockCryptoService) DecryptBatch(ctx context.Context, encryptedFields map[string]*kms.EncryptedField) (map[string][]byte, error) {
+func (m *mockCryptoService) DecryptBatch(ctx context.Context, encryptedFields map[string]*biz.EncryptedField) (map[string][]byte, error) {
 	result := make(map[string][]byte)
 	for fieldName, encryptedField := range encryptedFields {
-		result[fieldName] = encryptedField.EncryptedData.Ciphertext
+		result[fieldName] = encryptedField.Value
 	}
 	return result, nil
 }

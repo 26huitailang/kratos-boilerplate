@@ -5,15 +5,16 @@ import (
 	"fmt"
 	
 	"golang.org/x/crypto/pbkdf2"
+	"kratos-boilerplate/internal/biz"
 )
 
 // rootKeyGenerator 根密钥生成器实现
 type rootKeyGenerator struct {
-	config *Config
+	config *biz.KMSConfig
 }
 
 // NewRootKeyGenerator 创建根密钥生成器
-func NewRootKeyGenerator(config *Config) RootKeyGenerator {
+func NewRootKeyGenerator(config *biz.KMSConfig) RootKeyGenerator {
 	return &rootKeyGenerator{
 		config: config,
 	}
@@ -44,23 +45,23 @@ func (g *rootKeyGenerator) GenerateRootKey() ([]byte, error) {
 // ValidateConfig 验证配置
 func (g *rootKeyGenerator) ValidateConfig() error {
 	if g.config == nil {
-		return ErrInvalidConfig
+		return fmt.Errorf("config is nil")
 	}
 	
 	if g.config.Seed == "" {
-		return ErrInvalidSeed
+		return biz.ErrInvalidSeed
 	}
 	
 	if g.config.Salt == "" {
-		return ErrInvalidSalt
+		return biz.ErrInvalidSalt
 	}
 	
 	if g.config.Iterations < 10000 {
-		return ErrInvalidIterations
+		return biz.ErrInvalidIterations
 	}
 	
 	if g.config.KeyLength < 16 {
-		return ErrInvalidKeyLength
+		return biz.ErrInvalidKeyLength
 	}
 	
 	// 确保密钥长度是合理的（16, 24, 32字节对应AES-128, AES-192, AES-256）

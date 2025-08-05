@@ -33,7 +33,8 @@ func wireApp(confServer *conf.Server, confData *conf.Data, auth *conf.Auth, logg
 	greeterUsecase := biz.NewGreeterUsecase(greeterRepo, logger)
 	greeterService := service.NewGreeterService(greeterUsecase)
 	grpcServer := server.NewGRPCServer(confServer, greeterService, logger)
-	kmsManager := data.NewKMSManager(dataData, logger)
+	kmsRepo := data.NewKMSRepo(dataData, logger)
+	kmsManager := data.NewKMSManager(kmsRepo, logger)
 	userRepo, err := data.NewUserRepo(dataData, logger, kmsManager)
 	if err != nil {
 		cleanup()

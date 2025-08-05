@@ -67,7 +67,7 @@ func (w *kmsEncryptorWrapper) Encrypt(data []byte) ([]byte, error) {
 
 	// 将加密结果序列化为字节数组
 	// 这里简化处理，实际应该使用更完善的序列化方式
-	return []byte(fmt.Sprintf("%s:%s:%x", encryptedField.EncryptedData.KeyVersion, encryptedField.EncryptedData.Algorithm, encryptedField.EncryptedData.Ciphertext)), nil
+	return []byte(fmt.Sprintf("%s:%s:%x", encryptedField.Version, encryptedField.Algorithm, encryptedField.Value)), nil
 }
 
 // Decrypt 解密数据
@@ -84,13 +84,10 @@ func (w *kmsEncryptorWrapper) Decrypt(data []byte) ([]byte, error) {
 		return nil, fmt.Errorf("invalid ciphertext format: %w", err)
 	}
 
-	encryptedField := &kms.EncryptedField{
-		FieldName: "user_data",
-		EncryptedData: &kms.EncryptedData{
-			KeyVersion: parts[0],
-			Algorithm:  parts[1],
-			Ciphertext: ciphertext,
-		},
+	encryptedField := &biz.EncryptedField{
+		Value:     ciphertext,
+		Version:   parts[0],
+		Algorithm: parts[1],
 	}
 
 	decrypted, err := w.cryptoService.DecryptField(context.Background(), encryptedField)

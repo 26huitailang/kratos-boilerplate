@@ -9,8 +9,10 @@ import (
 	"encoding/hex"
 	"fmt"
 	"sync"
+	"time"
 	
 	"github.com/go-kratos/kratos/v2/log"
+	"kratos-boilerplate/internal/biz"
 )
 
 // cryptoService 统一加解密服务实现
@@ -23,8 +25,8 @@ type cryptoService struct {
 // keyCache 密钥缓存
 type keyCache struct {
 	mu         sync.RWMutex
-	activeKey  *DataKey
-	versionMap map[string]*DataKey
+	activeKey  *biz.DataKey
+	versionMap map[string]*biz.DataKey
 }
 
 // NewCryptoService 创建加解密服务
@@ -33,13 +35,13 @@ func NewCryptoService(dataKeyManager DataKeyManager, logger log.Logger) CryptoSe
 		dataKeyManager: dataKeyManager,
 		log:            log.NewHelper(logger),
 		cache: &keyCache{
-			versionMap: make(map[string]*DataKey),
+			versionMap: make(map[string]*biz.DataKey),
 		},
 	}
 }
 
 // EncryptField 加密敏感字段
-func (s *cryptoService) EncryptField(ctx context.Context, fieldName string, value []byte) (*EncryptedField, error) {
+func (s *cryptoService) EncryptField(ctx context.Context, fieldName string, value []byte) (*biz.EncryptedField, error) {
 	if len(value) == 0 {
 		return nil, fmt.Errorf("value cannot be empty")
 	}
@@ -51,18 +53,15 @@ func (s *cryptoService) EncryptField(ctx context.Context, fieldName string, valu
 	}
 	
 	// 执行加密
-	encryptedData, err := s.encryptWithDataKey(dataKey, value)
+	encryptedValue, err := s.encryptWithDataKey(dataKey, value)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrEncryptionFail, err)
+		return nil, fmt.Errorf("%w: %v", biz.ErrKeyEncryptionFail, err)
 	}
 	
-	// 计算哈希值
-	hash := s.HashField(value)
-	
-	encryptedField := &EncryptedField{
-		FieldName:     fieldName,
-		EncryptedData: encryptedData,
-		Hash:          hash,
+	encryptedField := &biz.EncryptedField{
+		Value:     encryptedValue,
+		Version:   dataKey.Version,
+		Algorithm: dataKey.Algorithm,
 	}
 	
 	s.log.Debugf("Field encrypted successfully: %s", fieldName)
@@ -70,24 +69,24 @@ func (s *cryptoService) EncryptField(ctx context.Context, fieldName string, valu
 }
 
 // DecryptField 解密敏感字段
-func (s *cryptoService) DecryptField(ctx context.Context, encryptedField *EncryptedField) ([]byte, error) {
-	if encryptedField == nil || encryptedField.EncryptedData == nil {
+func (s *cryptoService) DecryptField(ctx context.Context, encryptedField *biz.EncryptedField) ([]byte, error) {
+	if encryptedField == nil {
 		return nil, fmt.Errorf("encrypted field cannot be nil")
 	}
 	
 	// 根据版本获取数据密钥
-	dataKey, err := s.getDataKeyByVersion(ctx, encryptedField.EncryptedData.KeyVersion)
+	dataKey, err := s.getDataKeyByVersion(ctx, encryptedField.Version)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get data key: %w", err)
 	}
 	
 	// 执行解密
-	plaintext, err := s.decryptWithDataKey(dataKey, encryptedField.EncryptedData)
+	plaintext, err := s.decryptWithDataKey(dataKey, encryptedField.Value)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrDecryptionFail, err)
+		return nil, fmt.Errorf("%w: %v", biz.ErrKeyDecryptionFail, err)
 	}
 	
-	s.log.Debugf("Field decrypted successfully: %s", encryptedField.FieldName)
+	s.log.Debugf("Field decrypted successfully")
 	return plaintext, nil
 }
 
@@ -98,9 +97,9 @@ func (s *cryptoService) HashField(value []byte) string {
 }
 
 // EncryptBatch 批量加密
-func (s *cryptoService) EncryptBatch(ctx context.Context, fields map[string][]byte) (map[string]*EncryptedField, error) {
+func (s *cryptoService) EncryptBatch(ctx context.Context, fields map[string][]byte) (map[string]*biz.EncryptedField, error) {
 	if len(fields) == 0 {
-		return make(map[string]*EncryptedField), nil
+		return make(map[string]*biz.EncryptedField), nil
 	}
 	
 	// 获取活跃的数据密钥（一次获取，批量使用）
@@ -109,7 +108,7 @@ func (s *cryptoService) EncryptBatch(ctx context.Context, fields map[string][]by
 		return nil, fmt.Errorf("failed to get active data key: %w", err)
 	}
 	
-	result := make(map[string]*EncryptedField, len(fields))
+	result := make(map[string]*biz.EncryptedField, len(fields))
 	var encryptionErrors []string
 	
 	for fieldName, value := range fields {
@@ -119,19 +118,16 @@ func (s *cryptoService) EncryptBatch(ctx context.Context, fields map[string][]by
 		}
 		
 		// 执行加密
-		encryptedData, err := s.encryptWithDataKey(dataKey, value)
+		encryptedValue, err := s.encryptWithDataKey(dataKey, value)
 		if err != nil {
 			encryptionErrors = append(encryptionErrors, fmt.Sprintf("field %s: %v", fieldName, err))
 			continue
 		}
 		
-		// 计算哈希值
-		hash := s.HashField(value)
-		
-		result[fieldName] = &EncryptedField{
-			FieldName:     fieldName,
-			EncryptedData: encryptedData,
-			Hash:          hash,
+		result[fieldName] = &biz.EncryptedField{
+			Value:     encryptedValue,
+			Version:   dataKey.Version,
+			Algorithm: dataKey.Algorithm,
 		}
 	}
 	
@@ -145,7 +141,7 @@ func (s *cryptoService) EncryptBatch(ctx context.Context, fields map[string][]by
 }
 
 // DecryptBatch 批量解密
-func (s *cryptoService) DecryptBatch(ctx context.Context, fields map[string]*EncryptedField) (map[string][]byte, error) {
+func (s *cryptoService) DecryptBatch(ctx context.Context, fields map[string]*biz.EncryptedField) (map[string][]byte, error) {
 	if len(fields) == 0 {
 		return make(map[string][]byte), nil
 	}
@@ -154,20 +150,20 @@ func (s *cryptoService) DecryptBatch(ctx context.Context, fields map[string]*Enc
 	var decryptionErrors []string
 	
 	for fieldName, encryptedField := range fields {
-		if encryptedField == nil || encryptedField.EncryptedData == nil {
+		if encryptedField == nil {
 			decryptionErrors = append(decryptionErrors, fmt.Sprintf("field %s: encrypted field cannot be nil", fieldName))
 			continue
 		}
 		
 		// 根据版本获取数据密钥
-		dataKey, err := s.getDataKeyByVersion(ctx, encryptedField.EncryptedData.KeyVersion)
+		dataKey, err := s.getDataKeyByVersion(ctx, encryptedField.Version)
 		if err != nil {
 			decryptionErrors = append(decryptionErrors, fmt.Sprintf("field %s: failed to get data key: %v", fieldName, err))
 			continue
 		}
 		
 		// 执行解密
-		plaintext, err := s.decryptWithDataKey(dataKey, encryptedField.EncryptedData)
+		plaintext, err := s.decryptWithDataKey(dataKey, encryptedField.Value)
 		if err != nil {
 			decryptionErrors = append(decryptionErrors, fmt.Sprintf("field %s: %v", fieldName, err))
 			continue
@@ -186,9 +182,9 @@ func (s *cryptoService) DecryptBatch(ctx context.Context, fields map[string]*Enc
 }
 
 // getActiveDataKey 获取活跃的数据密钥（带缓存）
-func (s *cryptoService) getActiveDataKey(ctx context.Context) (*DataKey, error) {
+func (s *cryptoService) getActiveDataKey(ctx context.Context) (*biz.DataKey, error) {
 	s.cache.mu.RLock()
-	if s.cache.activeKey != nil && !s.cache.activeKey.IsExpired() {
+	if s.cache.activeKey != nil && !s.isKeyExpired(s.cache.activeKey) {
 		key := s.cache.activeKey
 		s.cache.mu.RUnlock()
 		return key, nil
@@ -200,7 +196,7 @@ func (s *cryptoService) getActiveDataKey(ctx context.Context) (*DataKey, error) 
 	defer s.cache.mu.Unlock()
 	
 	// 双重检查
-	if s.cache.activeKey != nil && !s.cache.activeKey.IsExpired() {
+	if s.cache.activeKey != nil && !s.isKeyExpired(s.cache.activeKey) {
 		return s.cache.activeKey, nil
 	}
 	
@@ -217,7 +213,7 @@ func (s *cryptoService) getActiveDataKey(ctx context.Context) (*DataKey, error) 
 }
 
 // getDataKeyByVersion 根据版本获取数据密钥（带缓存）
-func (s *cryptoService) getDataKeyByVersion(ctx context.Context, version string) (*DataKey, error) {
+func (s *cryptoService) getDataKeyByVersion(ctx context.Context, version string) (*biz.DataKey, error) {
 	s.cache.mu.RLock()
 	if key, exists := s.cache.versionMap[version]; exists {
 		s.cache.mu.RUnlock()
@@ -240,7 +236,7 @@ func (s *cryptoService) getDataKeyByVersion(ctx context.Context, version string)
 }
 
 // encryptWithDataKey 使用数据密钥加密
-func (s *cryptoService) encryptWithDataKey(dataKey *DataKey, plaintext []byte) (*EncryptedData, error) {
+func (s *cryptoService) encryptWithDataKey(dataKey *biz.DataKey, plaintext []byte) ([]byte, error) {
 	block, err := aes.NewCipher(dataKey.Key)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cipher: %w", err)
@@ -256,18 +252,12 @@ func (s *cryptoService) encryptWithDataKey(dataKey *DataKey, plaintext []byte) (
 		return nil, fmt.Errorf("failed to generate nonce: %w", err)
 	}
 	
-	ciphertext := gcm.Seal(nil, nonce, plaintext, nil)
-	
-	return &EncryptedData{
-		KeyVersion: dataKey.Version,
-		Algorithm:  dataKey.Algorithm,
-		Nonce:      nonce,
-		Ciphertext: ciphertext,
-	}, nil
+	ciphertext := gcm.Seal(nonce, nonce, plaintext, nil)
+	return ciphertext, nil
 }
 
 // decryptWithDataKey 使用数据密钥解密
-func (s *cryptoService) decryptWithDataKey(dataKey *DataKey, encryptedData *EncryptedData) ([]byte, error) {
+func (s *cryptoService) decryptWithDataKey(dataKey *biz.DataKey, ciphertext []byte) ([]byte, error) {
 	block, err := aes.NewCipher(dataKey.Key)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cipher: %w", err)
@@ -278,16 +268,25 @@ func (s *cryptoService) decryptWithDataKey(dataKey *DataKey, encryptedData *Encr
 		return nil, fmt.Errorf("failed to create GCM: %w", err)
 	}
 	
-	if len(encryptedData.Nonce) != gcm.NonceSize() {
-		return nil, ErrInvalidNonce
+	nonceSize := gcm.NonceSize()
+	if len(ciphertext) < nonceSize {
+		return nil, biz.ErrInvalidCiphertext
 	}
 	
-	plaintext, err := gcm.Open(nil, encryptedData.Nonce, encryptedData.Ciphertext, nil)
+	nonce := ciphertext[:nonceSize]
+	ciphertextData := ciphertext[nonceSize:]
+	
+	plaintext, err := gcm.Open(nil, nonce, ciphertextData, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decrypt: %w", err)
 	}
 	
 	return plaintext, nil
+}
+
+// isKeyExpired 检查密钥是否过期
+func (s *cryptoService) isKeyExpired(dataKey *biz.DataKey) bool {
+	return time.Now().After(dataKey.ExpiresAt)
 }
 
 // ClearCache 清除密钥缓存
@@ -297,15 +296,26 @@ func (s *cryptoService) ClearCache() {
 	
 	// 清除敏感数据
 	if s.cache.activeKey != nil {
-		s.cache.activeKey.Clear()
+		s.clearDataKey(s.cache.activeKey)
 	}
 	
 	for _, key := range s.cache.versionMap {
-		key.Clear()
+		s.clearDataKey(key)
 	}
 	
 	s.cache.activeKey = nil
-	s.cache.versionMap = make(map[string]*DataKey)
+	s.cache.versionMap = make(map[string]*biz.DataKey)
 	
 	s.log.Info("Crypto service cache cleared")
+}
+
+// clearDataKey 清除数据密钥中的敏感信息
+func (s *cryptoService) clearDataKey(dataKey *biz.DataKey) {
+	if len(dataKey.Key) > 0 {
+		// 用零值覆盖密钥数据
+		for i := range dataKey.Key {
+			dataKey.Key[i] = 0
+		}
+		dataKey.Key = nil
+	}
 }

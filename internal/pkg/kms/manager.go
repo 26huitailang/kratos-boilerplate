@@ -2,17 +2,17 @@ package kms
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"sync"
 	"time"
 	
 	"github.com/go-kratos/kratos/v2/log"
+	"kratos-boilerplate/internal/biz"
 )
 
 // kmsManager KMS管理器实现
 type kmsManager struct {
-	config         *Config
+	config         *biz.KMSConfig
 	rootKeyGen     RootKeyGenerator
 	dataKeyManager DataKeyManager
 	cryptoService  CryptoService
@@ -31,26 +31,35 @@ type kmsManager struct {
 }
 
 // NewKMSManager 创建KMS管理器
-func NewKMSManager(db *sql.DB, logger log.Logger) KMSManager {
-	return &kmsManager{
+func NewKMSManager(storage KeyStorage, config *biz.KMSConfig, logger log.Logger) KMSManager {
+	manager := &kmsManager{
+		config:       config,
 		log:          log.NewHelper(logger),
-		storage:      NewDatabaseKeyStorage(db, logger),
+		storage:      storage,
 		rotationDone: make(chan struct{}),
 		logger:       logger, // 保存原始logger
 	}
+	
+	// 自动初始化
+	ctx := context.Background()
+	if err := manager.Initialize(ctx, config); err != nil {
+		log.NewHelper(logger).Errorf("Failed to initialize KMS manager: %v", err)
+	}
+	
+	return manager
 }
 
 // Initialize 初始化KMS系统
-func (m *kmsManager) Initialize(ctx context.Context, config *Config) error {
+func (m *kmsManager) Initialize(ctx context.Context, config *biz.KMSConfig) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	
 	if m.initialized {
-		return ErrKMSAlreadyInit
+		return biz.ErrKMSAlreadyInit
 	}
 	
 	if m.shutdown {
-		return ErrSystemShutdown
+		return biz.ErrSystemShutdown
 	}
 	
 	// 验证配置
@@ -91,7 +100,7 @@ func (m *kmsManager) Initialize(ctx context.Context, config *Config) error {
 }
 
 // GetActiveDataKey 获取当前活跃的数据密钥
-func (m *kmsManager) GetActiveDataKey(ctx context.Context) (*DataKey, error) {
+func (m *kmsManager) GetActiveDataKey(ctx context.Context) (*biz.DataKey, error) {
 	if err := m.checkInitialized(); err != nil {
 		return nil, err
 	}
@@ -100,7 +109,7 @@ func (m *kmsManager) GetActiveDataKey(ctx context.Context) (*DataKey, error) {
 }
 
 // GetDataKeyByVersion 根据版本获取数据密钥
-func (m *kmsManager) GetDataKeyByVersion(ctx context.Context, version string) (*DataKey, error) {
+func (m *kmsManager) GetDataKeyByVersion(ctx context.Context, version string) (*biz.DataKey, error) {
 	if err := m.checkInitialized(); err != nil {
 		return nil, err
 	}
@@ -109,7 +118,7 @@ func (m *kmsManager) GetDataKeyByVersion(ctx context.Context, version string) (*
 }
 
 // RotateDataKey 轮换数据密钥
-func (m *kmsManager) RotateDataKey(ctx context.Context) (*DataKey, error) {
+func (m *kmsManager) RotateDataKey(ctx context.Context) (*biz.DataKey, error) {
 	if err := m.checkInitialized(); err != nil {
 		return nil, err
 	}
@@ -129,6 +138,29 @@ func (m *kmsManager) RotateDataKey(ctx context.Context) (*DataKey, error) {
 	
 	m.log.Infof("Data key rotation completed: %s", newKey.Version)
 	return newKey, nil
+}
+
+// EncryptField 加密敏感字段
+func (m *kmsManager) EncryptField(ctx context.Context, fieldName string, value []byte) (*biz.EncryptedField, error) {
+	if err := m.checkInitialized(); err != nil {
+		return nil, err
+	}
+	
+	return m.cryptoService.EncryptField(ctx, fieldName, value)
+}
+
+// DecryptField 解密敏感字段
+func (m *kmsManager) DecryptField(ctx context.Context, encryptedField *biz.EncryptedField) ([]byte, error) {
+	if err := m.checkInitialized(); err != nil {
+		return nil, err
+	}
+	
+	return m.cryptoService.DecryptField(ctx, encryptedField)
+}
+
+// HashField 计算哈希值
+func (m *kmsManager) HashField(value []byte) string {
+	return m.cryptoService.HashField(value)
 }
 
 // GetCryptoService 获取加解密服务
@@ -165,10 +197,10 @@ func (m *kmsManager) Close() error {
 // ensureActiveDataKey 确保存在活跃的数据密钥
 func (m *kmsManager) ensureActiveDataKey(ctx context.Context) error {
 	_, err := m.dataKeyManager.GetActiveDataKey(ctx)
-	if err == ErrNoActiveKey {
+	if err == biz.ErrNoActiveKey {
 		// 没有活跃密钥，生成一个新的
 		m.log.Info("No active data key found, generating new one")
-		_, err = m.dataKeyManager.GenerateDataKey(ctx)
+		_, err = m.dataKeyManager.GenerateDataKey(ctx, m.config.Algorithm)
 		if err != nil {
 			return fmt.Errorf("failed to generate initial data key: %w", err)
 		}
@@ -209,11 +241,11 @@ func (m *kmsManager) checkInitialized() error {
 	defer m.mu.RUnlock()
 	
 	if m.shutdown {
-		return ErrSystemShutdown
+		return biz.ErrSystemShutdown
 	}
 	
 	if !m.initialized {
-		return ErrKMSNotInitialized
+		return biz.ErrKMSNotInitialized
 	}
 	
 	return nil
@@ -241,11 +273,9 @@ func (m *kmsManager) GetStatus(ctx context.Context) (*KMSStatus, error) {
 		}
 		
 		// 获取密钥统计信息
-		if storage, ok := m.storage.(*databaseKeyStorage); ok {
-			stats, err := storage.GetKeyStatistics(ctx)
-			if err == nil {
-				status.KeyStatistics = stats
-			}
+		stats, err := m.storage.GetKeyStatistics(ctx)
+		if err == nil {
+			status.KeyStatistics = stats
 		}
 	}
 	
@@ -260,7 +290,7 @@ type KMSStatus struct {
 	RotateInterval   time.Duration     `json:"rotate_interval,omitempty"`
 	ActiveKeyVersion string            `json:"active_key_version,omitempty"`
 	ActiveKeyExpiry  time.Time         `json:"active_key_expiry,omitempty"`
-	KeyStatistics    map[string]int64  `json:"key_statistics,omitempty"`
+	KeyStatistics    *biz.KeyStatistics  `json:"key_statistics,omitempty"`
 }
 
 // PerformMaintenance 执行维护操作
@@ -272,11 +302,9 @@ func (m *kmsManager) PerformMaintenance(ctx context.Context) error {
 	m.log.Info("Starting KMS maintenance")
 	
 	// 清理过期密钥
-	if storage, ok := m.storage.(*databaseKeyStorage); ok {
-		if err := storage.CleanupExpiredKeys(ctx); err != nil {
-			m.log.Errorf("Failed to cleanup expired keys: %v", err)
-			return err
-		}
+	if err := m.storage.CleanupExpiredKeys(ctx); err != nil {
+		m.log.Errorf("Failed to cleanup expired keys: %v", err)
+		return err
 	}
 	
 	// 清除缓存
