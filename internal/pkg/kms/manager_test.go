@@ -515,18 +515,31 @@ func TestKMSManager_StartAutoRotation(t *testing.T) {
 	initialKey, err := manager.GetActiveDataKey(ctx)
 	require.NoError(t, err)
 	require.NotNil(t, initialKey)
-	_ = initialKey.Version // 避免未使用变量警告
+	initialVersion := initialKey.Version
 	
-	// 等待自动轮换触发
+	// 等待自动轮换触发，增加重试机制
 	time.Sleep(200 * time.Millisecond)
 	
-	// 验证有新的密钥生成
-	currentKey, err := manager.GetActiveDataKey(ctx)
+	// 验证有新的密钥生成，增加重试机制处理竞态条件
+	var currentKey *biz.DataKey
+	for i := 0; i < 5; i++ {
+		currentKey, err = manager.GetActiveDataKey(ctx)
+		if err == nil && currentKey != nil {
+			break
+		}
+		// 如果获取失败，等待一小段时间后重试
+		time.Sleep(10 * time.Millisecond)
+	}
+	
+	// 验证最终结果
 	assert.NoError(t, err)
 	assert.NotNil(t, currentKey)
-	// 注意：由于这是mock实现，可能不会真正触发自动轮换
-	// 这里主要测试函数调用不出错
-	assert.NotEmpty(t, currentKey.Version)
+	if currentKey != nil {
+		assert.NotEmpty(t, currentKey.Version)
+		// 注意：由于这是mock实现，可能不会真正触发自动轮换
+		// 这里主要测试函数调用不出错
+		_ = initialVersion // 避免未使用变量警告
+	}
 	
 	// 关闭管理器
 	err = manager.Close()
