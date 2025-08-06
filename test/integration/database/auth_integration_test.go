@@ -12,6 +12,7 @@ import (
 	"kratos-boilerplate/internal/biz"
 	"kratos-boilerplate/internal/conf"
 	"kratos-boilerplate/internal/data"
+	"kratos-boilerplate/internal/pkg/kms"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/stretchr/testify/assert"
@@ -67,8 +68,11 @@ func (suite *AuthIntegrationTestSuite) SetupSuite() {
 	suite.data, suite.cleanup, err = data.NewData(config, suite.logger)
 	require.NoError(suite.T(), err, "Failed to setup test database")
 
+	// 创建KMS管理器
+	kmsManager := &mockKMSManager{}
+
 	// 创建用户仓储
-	suite.userRepo, err = data.NewUserRepo(suite.data, suite.logger)
+	suite.userRepo, err = data.NewUserRepo(suite.data, suite.logger, kmsManager)
 	require.NoError(suite.T(), err, "Failed to create user repository")
 }
 
@@ -352,4 +356,121 @@ func TestAuthIntegrationSuite(t *testing.T) {
 	}
 
 	suite.Run(t, new(AuthIntegrationTestSuite))
+}
+
+// mockKMSManager 是用于测试的模拟KMS管理器
+type mockKMSManager struct{}
+
+func (m *mockKMSManager) Initialize(ctx context.Context, config *biz.KMSConfig) error {
+	return nil
+}
+
+func (m *mockKMSManager) GetActiveDataKey(ctx context.Context) (*biz.DataKey, error) {
+	return &biz.DataKey{
+		ID:        "test-key-id",
+		Version:   "v1",
+		Algorithm: "AES-GCM-256",
+		Key:       []byte("0123456789abcdef0123456789abcdef"),
+		IsActive:  true,
+	}, nil
+}
+
+func (m *mockKMSManager) GetDataKeyByVersion(ctx context.Context, version string) (*biz.DataKey, error) {
+	return &biz.DataKey{
+		ID:        "test-key-id",
+		Version:   version,
+		Algorithm: "AES-GCM-256",
+		Key:       []byte("0123456789abcdef0123456789abcdef"),
+		IsActive:  true,
+	}, nil
+}
+
+func (m *mockKMSManager) RotateDataKey(ctx context.Context) (*biz.DataKey, error) {
+	return &biz.DataKey{
+		ID:        "test-key-id-new",
+		Version:   "v2",
+		Algorithm: "AES-GCM-256",
+		Key:       []byte("0123456789abcdef0123456789abcdef"),
+		IsActive:  true,
+	}, nil
+}
+
+func (m *mockKMSManager) GetCryptoService() kms.CryptoService {
+	return &mockCryptoService{}
+}
+
+func (m *mockKMSManager) GetStatus(ctx context.Context) (*kms.KMSStatus, error) {
+	return &kms.KMSStatus{
+		Initialized:      true,
+		Shutdown:         false,
+		Algorithm:        "AES-GCM-256",
+		ActiveKeyVersion: "test-key-id",
+	}, nil
+}
+
+func (m *mockKMSManager) ClearCache(ctx context.Context) error {
+	return nil
+}
+
+func (m *mockKMSManager) PerformMaintenance(ctx context.Context) error {
+	return nil
+}
+
+func (m *mockKMSManager) Close() error {
+	return nil
+}
+
+// mockCryptoService 是用于测试的模拟加密服务
+type mockCryptoService struct{}
+
+func (m *mockCryptoService) EncryptField(ctx context.Context, fieldName string, value []byte) (*biz.EncryptedField, error) {
+	// 简单的模拟加密
+	encryptedData := append([]byte("encrypted:"), value...)
+	return &biz.EncryptedField{
+		Value:     encryptedData,
+		Version:   "v1",
+		Algorithm: "AES-GCM-256",
+	}, nil
+}
+
+func (m *mockCryptoService) DecryptField(ctx context.Context, encryptedField *biz.EncryptedField) ([]byte, error) {
+	// 简单的模拟解密：移除前缀
+	prefix := []byte("encrypted:")
+	if len(encryptedField.Value) < len(prefix) {
+		return nil, fmt.Errorf("invalid encrypted data")
+	}
+	return encryptedField.Value[len(prefix):], nil
+}
+
+func (m *mockCryptoService) HashField(value []byte) string {
+	// 简单的模拟哈希：返回数据的长度作为哈希字符串
+	return fmt.Sprintf("hash_%d", len(value))
+}
+
+func (m *mockCryptoService) EncryptBatch(ctx context.Context, fields map[string][]byte) (map[string]*biz.EncryptedField, error) {
+	result := make(map[string]*biz.EncryptedField)
+	for fieldName, value := range fields {
+		encrypted, err := m.EncryptField(ctx, fieldName, value)
+		if err != nil {
+			return nil, err
+		}
+		result[fieldName] = encrypted
+	}
+	return result, nil
+}
+
+func (m *mockCryptoService) DecryptBatch(ctx context.Context, fields map[string]*biz.EncryptedField) (map[string][]byte, error) {
+	result := make(map[string][]byte)
+	for fieldName, encryptedField := range fields {
+		decrypted, err := m.DecryptField(ctx, encryptedField)
+		if err != nil {
+			return nil, err
+		}
+		result[fieldName] = decrypted
+	}
+	return result, nil
+}
+
+func (m *mockCryptoService) ClearCache() {
+	// 模拟清除缓存，实际上什么都不做
 }
