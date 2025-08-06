@@ -1,5 +1,9 @@
 package sensitive
 
+import (
+	"context"
+)
+
 // MakeSensitive 敏感信息脱敏接口
 type MakeSensitive interface {
 	// 获取敏感字段列表
@@ -77,18 +81,42 @@ type LogSanitizer interface {
 
 // SensitiveDetector 敏感信息检测器接口
 type SensitiveDetector interface {
-	// 检测邮箱
-	DetectEmail(text string) []string
-	
-	// 检测手机号
-	DetectPhone(text string) []string
-	
-	// 检测身份证号
-	DetectIDCard(text string) []string
-	
-	// 检测银行卡号
-	DetectBankCard(text string) []string
+	// 检测特定类型的敏感信息
+	DetectSensitiveInfo(text string, infoType string) []string
 	
 	// 检测所有敏感信息
 	DetectAll(text string) map[string][]string
+	
+	// 检查是否包含敏感信息
+	HasSensitiveInfo(text string, infoType string) bool
+}
+
+// StructuredLoggerInterface 结构化日志器接口
+type StructuredLoggerInterface interface {
+	// 结构化日志方法
+	Infow(msg string, keysAndValues ...interface{})
+	Debugw(msg string, keysAndValues ...interface{})
+	Errorw(msg string, keysAndValues ...interface{})
+	Warnw(msg string, keysAndValues ...interface{})
+	Fatalw(msg string, keysAndValues ...interface{})
+	
+	// 兼容性方法
+	Info(args ...interface{})
+	Infof(template string, args ...interface{})
+	Debug(args ...interface{})
+	Debugf(template string, args ...interface{})
+	Error(args ...interface{})
+	Errorf(template string, args ...interface{})
+	Warn(args ...interface{})
+	Warnf(template string, args ...interface{})
+	Fatal(args ...interface{})
+	Fatalf(template string, args ...interface{})
+	
+	// 上下文和字段方法
+	WithContext(ctx context.Context) StructuredLoggerInterface
+	WithFields(keysAndValues ...interface{}) StructuredLoggerInterface
+	
+	// 配置方法
+	UpdateRules(rules map[string]AnonymizeRule)
+	AddSensitiveKey(key string)
 }

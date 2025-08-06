@@ -386,24 +386,28 @@ func TestSensitiveDetector_Methods(t *testing.T) {
 	detector := NewSensitiveDetector()
 	
 	// 测试邮箱检测
-	emails := detector.DetectEmail("Contact us at test@example.com for help")
+	emails := detector.DetectSensitiveInfo("Contact us at test@example.com for help", "email")
 	assert.Len(t, emails, 1)
 	assert.Equal(t, "test@example.com", emails[0])
 	
 	// 测试手机号检测
-	phones := detector.DetectPhone("Call me at 13812345678")
+	phones := detector.DetectSensitiveInfo("Call me at 13812345678", "phone")
 	assert.Len(t, phones, 1)
 	assert.Equal(t, "13812345678", phones[0])
 	
 	// 测试身份证检测
-	idCards := detector.DetectIDCard("My ID is 110101199001011234")
+	idCards := detector.DetectSensitiveInfo("My ID is 110101199001011234", "idcard")
 	assert.Len(t, idCards, 1)
 	assert.Equal(t, "110101199001011234", idCards[0])
 	
 	// 测试银行卡检测
-	bankCards := detector.DetectBankCard("Card number: 6222021234567890")
+	bankCards := detector.DetectSensitiveInfo("Card number: 6222021234567890", "bankcard")
 	assert.Len(t, bankCards, 1)
 	assert.Equal(t, "6222021234567890", bankCards[0])
+	
+	// 测试HasSensitiveInfo方法
+	assert.True(t, detector.HasSensitiveInfo("test@example.com", "email"))
+	assert.False(t, detector.HasSensitiveInfo("normal text", "email"))
 	
 	// 测试检测所有敏感信息
 	allDetected := detector.DetectAll("Email: test@example.com, Phone: 13812345678")

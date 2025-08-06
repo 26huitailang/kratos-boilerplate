@@ -93,6 +93,33 @@ test-all:
 	make generate
 	make test
 
+.PHONY: logcheck
+# check log usage compliance
+logcheck:
+	@echo "Building log checker..."
+	@cd tools/logchecker && go build -o logchecker .
+	@echo "Running log compliance check..."
+	@cd tools/logchecker && ./logchecker -dir ../../internal -config logchecker.json
+
+.PHONY: logcheck-json
+# check log usage compliance and output JSON report
+logcheck-json:
+	@cd tools/logchecker && go build -o logchecker .
+	@cd tools/logchecker && ./logchecker -dir ../../internal -config logchecker.json -output json
+
+.PHONY: logcheck-html
+# check log usage compliance and output HTML report
+logcheck-html:
+	@cd tools/logchecker && go build -o logchecker .
+	@cd tools/logchecker && ./logchecker -dir ../../internal -config logchecker.json -output html > ../../logcheck-report.html
+	@echo "HTML report generated: logcheck-report.html"
+
+.PHONY: logcheck-install
+# install log checker tool
+logcheck-install:
+	@cd tools/logchecker && go build -o $(GOPATH)/bin/logchecker .
+	@echo "Log checker installed to $(GOPATH)/bin/logchecker"
+
 # show help
 help:
 	@echo ''

@@ -87,7 +87,7 @@ func TestSensitiveDetector_DetectEmail(t *testing.T) {
 	
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := detector.DetectEmail(tt.text)
+			result := detector.DetectSensitiveInfo(tt.text, "email")
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -121,7 +121,7 @@ func TestSensitiveDetector_DetectPhone(t *testing.T) {
 	
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := detector.DetectPhone(tt.text)
+			result := detector.DetectSensitiveInfo(tt.text, "phone")
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -155,7 +155,7 @@ func TestSensitiveDetector_DetectIDCard(t *testing.T) {
 	
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := detector.DetectIDCard(tt.text)
+			result := detector.DetectSensitiveInfo(tt.text, "idcard")
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -184,7 +184,7 @@ func TestSensitiveDetector_DetectBankCard(t *testing.T) {
 	
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := detector.DetectBankCard(tt.text)
+			result := detector.DetectSensitiveInfo(tt.text, "bankcard")
 			assert.Equal(t, tt.expected, result)
 		})
 	}

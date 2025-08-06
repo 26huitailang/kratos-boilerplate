@@ -1,0 +1,58 @@
+{
+  "skip_test_files": true,
+  "ignore_files": [
+    "*.pb.go",
+    "*.gen.go",
+    "vendor/*",
+    ".git/*"
+  ],
+  "ignore_dirs": [
+    "vendor",
+    ".git",
+    "node_modules",
+    "third_party"
+  ],
+  "whitelist_files": [],
+  "whitelist_methods": [
+    "Printf"
+  ],
+  "sensitive_keywords": [
+    "password",
+    "token",
+    "secret",
+    "key",
+    "auth",
+    "email",
+    "phone",
+    "mobile",
+    "card",
+    "id",
+    "user",
+    "account",
+    "login",
+    "credential",
+    "session",
+    "cookie",
+    "jwt",
+    "oauth"
+  ],
+  "min_message_length": 50,
+  "severity_config": {
+    "error_methods": [
+      "Errorf",
+      "Error"
+    ],
+    "warn_methods": [
+      "Warnf",
+      "Warn",
+      "Warningf",
+      "Warning"
+    ],
+    "info_methods": [
+      "Infof",
+      "Info",
+      "Debugf",
+      "Debug"
+    ]
+  }
+}

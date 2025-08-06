@@ -68,6 +68,28 @@ jobs:
       - name: Generate proto files
         run: make all
 
+      - name: Check log usage compliance
+        run: |
+          echo "Running log compliance check..."
+          make logcheck
+        continue-on-error: true  # 不阻塞CI流程，但会显示警告
+
+      - name: Generate log compliance report
+        run: |
+          make logcheck-json > log-compliance-report.json || true
+          make logcheck-html > log-compliance-report.html || true
+        continue-on-error: true
+
+      - name: Upload log compliance reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: log-compliance-reports
+          path: |
+            log-compliance-report.json
+            log-compliance-report.html
+          retention-days: 30
+
       - name: Wait for services
         run: |
           sleep 10

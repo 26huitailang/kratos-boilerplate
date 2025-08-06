@@ -314,6 +314,28 @@ func NewSensitiveDetector() SensitiveDetector {
 	}
 }
 
+// DetectSensitiveInfo 检测特定类型的敏感信息
+func (s *sensitiveDetector) DetectSensitiveInfo(text string, infoType string) []string {
+	switch strings.ToLower(infoType) {
+	case "email":
+		return s.DetectEmail(text)
+	case "phone":
+		return s.DetectPhone(text)
+	case "idcard", "id_card":
+		return s.DetectIDCard(text)
+	case "bankcard", "bank_card":
+		return s.DetectBankCard(text)
+	default:
+		return nil
+	}
+}
+
+// HasSensitiveInfo 检查是否包含敏感信息
+func (s *sensitiveDetector) HasSensitiveInfo(text string, infoType string) bool {
+	matches := s.DetectSensitiveInfo(text, infoType)
+	return len(matches) > 0
+}
+
 // DetectEmail 检测邮箱
 func (s *sensitiveDetector) DetectEmail(text string) []string {
 	return s.emailRegex.FindAllString(text, -1)
