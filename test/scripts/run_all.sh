@@ -287,7 +287,8 @@ run_unit_tests() {
         fi
         
         # 运行单元测试（排除service层，因为service层使用BDD）
-        if go test $verbose_flag $coverage_flag $(go list ./internal/... | grep -v '/service'); then
+        # 使用-p=1确保串行运行，避免并发测试导致的竞态条件
+        if go test -p=1 $verbose_flag $coverage_flag $(go list ./internal/... | grep -v '/service'); then
             log_success "单元测试通过"
             
             if [ "$GENERATE_COVERAGE" = true ]; then

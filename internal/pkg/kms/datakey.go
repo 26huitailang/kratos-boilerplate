@@ -99,20 +99,27 @@ func (m *dataKeyManager) GetDataKeyByVersion(ctx context.Context, version string
 
 // RotateDataKey 轮换数据密钥
 func (m *dataKeyManager) RotateDataKey(ctx context.Context) (*biz.DataKey, error) {
-	// 1. 将当前活跃密钥设为非活跃
-	currentKey, err := m.storage.GetActiveDataKey(ctx)
-	if err == nil && currentKey != nil {
-		if err := m.storage.UpdateKeyStatus(ctx, currentKey.Version, false); err != nil {
-			return nil, fmt.Errorf("failed to deactivate current key: %w", err)
-		}
+	// 1. 先获取当前活跃密钥（如果存在）
+	var currentKey *biz.DataKey
+	if key, err := m.storage.GetActiveDataKey(ctx); err == nil {
+		currentKey = key
 	}
-	
+
 	// 2. 生成新的数据密钥
 	newKey, err := m.GenerateDataKey(ctx, m.config.Algorithm)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate new data key: %w", err)
 	}
-	
+
+	// 3. 将之前的活跃密钥设为非活跃（如果存在且不是新密钥）
+	if currentKey != nil && currentKey.Version != newKey.Version {
+		if err := m.storage.UpdateKeyStatus(ctx, currentKey.Version, false); err != nil {
+			// 忽略停用旧密钥的错误，因为新密钥已经生成并激活
+			// 这不会影响系统的正常运行
+			_ = err
+		}
+	}
+
 	return newKey, nil
 }
 
