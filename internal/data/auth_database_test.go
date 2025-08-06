@@ -312,6 +312,19 @@ func (m *mockKMSManager) GetCryptoService() kms.CryptoService {
 	return &mockCryptoService{}
 }
 
+func (m *mockKMSManager) GetStatus(ctx context.Context) (*kms.KMSStatus, error) {
+	return &kms.KMSStatus{
+		Initialized:      true,
+		Shutdown:         false,
+		Algorithm:        "AES-256-GCM",
+		ActiveKeyVersion: "v1",
+	}, nil
+}
+
+func (m *mockKMSManager) PerformMaintenance(ctx context.Context) error {
+	return nil
+}
+
 func (m *mockKMSManager) Close() error {
 	return nil
 }
@@ -393,4 +406,8 @@ func (m *mockCryptoService) DecryptBatch(ctx context.Context, encryptedFields ma
 		result[fieldName] = encryptedField.Value
 	}
 	return result, nil
+}
+
+func (m *mockCryptoService) ClearCache() {
+	// Mock implementation - no-op
 }

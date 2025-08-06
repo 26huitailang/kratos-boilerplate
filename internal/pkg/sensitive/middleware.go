@@ -225,7 +225,8 @@ func (m *LogSanitizeMiddleware) logWithSanitization(logType string, data map[str
 // isExcludedPath 检查是否为排除路径
 func (m *LogSanitizeMiddleware) isExcludedPath(operation string) bool {
 	for _, excludePath := range m.config.ExcludePaths {
-		if strings.Contains(operation, excludePath) {
+		// 使用前缀匹配而不是包含匹配，避免误匹配
+		if strings.HasPrefix(operation, excludePath) {
 			return true
 		}
 	}

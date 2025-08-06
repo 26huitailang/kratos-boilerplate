@@ -126,6 +126,14 @@ func Anonymize(data string, keepStart, keepEnd int) string {
 	runes := []rune(data)
 	length := len(runes)
 
+	// 处理负数参数
+	if keepStart < 0 {
+		keepStart = 0
+	}
+	if keepEnd < 0 {
+		keepEnd = 0
+	}
+
 	if length <= keepStart+keepEnd {
 		return string(runes)
 	}

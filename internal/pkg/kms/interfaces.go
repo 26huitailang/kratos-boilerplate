@@ -2,6 +2,7 @@ package kms
 
 import (
 	"context"
+	"time"
 	"kratos-boilerplate/internal/biz"
 )
 
@@ -21,6 +22,12 @@ type KMSManager interface {
 	
 	// 获取加解密服务
 	GetCryptoService() CryptoService
+	
+	// 获取系统状态
+	GetStatus(ctx context.Context) (*KMSStatus, error)
+	
+	// 执行维护操作
+	PerformMaintenance(ctx context.Context) error
 	
 	// 关闭KMS系统
 	Close() error
@@ -42,6 +49,9 @@ type CryptoService interface {
 	
 	// 批量解密
 	DecryptBatch(ctx context.Context, fields map[string]*biz.EncryptedField) (map[string][]byte, error)
+	
+	// 清除密钥缓存
+	ClearCache()
 }
 
 // KeyStorage 密钥存储接口 - 使用Repository模式
@@ -75,6 +85,12 @@ type RootKeyGenerator interface {
 	
 	// 验证配置
 	ValidateConfig() error
+	
+	// 获取密钥强度描述
+	GetKeyStrength() string
+	
+	// 估算密钥生成时间（毫秒）
+	EstimateGenerationTime() int64
 }
 
 // DataKeyManager 数据密钥管理器接口
@@ -96,4 +112,15 @@ type DataKeyManager interface {
 	
 	// 使用数据密钥解密
 	DecryptWithDataKey(ctx context.Context, encryptedField *biz.EncryptedField) ([]byte, error)
+}
+
+// KMSStatus KMS系统状态
+type KMSStatus struct {
+	Initialized      bool              `json:"initialized"`
+	Shutdown         bool              `json:"shutdown"`
+	Algorithm        string            `json:"algorithm,omitempty"`
+	RotateInterval   time.Duration     `json:"rotate_interval,omitempty"`
+	ActiveKeyVersion string            `json:"active_key_version,omitempty"`
+	ActiveKeyExpiry  time.Time         `json:"active_key_expiry,omitempty"`
+	KeyStatistics    *biz.KeyStatistics  `json:"key_statistics,omitempty"`
 }

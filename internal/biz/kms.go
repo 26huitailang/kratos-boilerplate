@@ -136,4 +136,5 @@ var (
 	ErrInvalidAlgorithm   = errors.New("无效的算法")
 	ErrKeyGenerationFail  = errors.New("密钥生成失败")
 	ErrStorageOperation   = errors.New("存储操作失败")
+	ErrCleanupFailed      = errors.New("清理操作失败")
 )

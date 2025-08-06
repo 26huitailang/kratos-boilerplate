@@ -1,7 +1,10 @@
 package crypto
 
 import (
+	"fmt"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -264,4 +267,169 @@ func TestSM3Encryptor_Integration(t *testing.T) {
 	assert.Error(t, err)
 	assert.Nil(t, decrypted)
 	assert.Contains(t, err.Error(), "SM3 is a hash algorithm, decryption is not supported")
+}
+
+// 测试SM3加密器的边界情况
+func TestSM3Encryptor_EdgeCases(t *testing.T) {
+	key := make([]byte, 32)
+	encryptor, err := NewSM3Encryptor(key)
+	require.NoError(t, err)
+
+	// 测试极大数据
+	largeData := make([]byte, 1024*1024) // 1MB
+	for i := range largeData {
+		largeData[i] = byte(i % 256)
+	}
+
+	ciphertext, err := encryptor.Encrypt(largeData)
+	assert.NoError(t, err)
+	assert.NotNil(t, ciphertext)
+
+	hash := encryptor.Hash(largeData)
+	assert.NotEmpty(t, hash)
+	assert.Len(t, hash, 64)
+
+	// 测试特殊字符
+	specialData := []byte("\x00\x01\x02\xFF\xFE\xFD")
+	ciphertext, err = encryptor.Encrypt(specialData)
+	assert.NoError(t, err)
+	assert.NotNil(t, ciphertext)
+
+	hash = encryptor.Hash(specialData)
+	assert.NotEmpty(t, hash)
+	assert.Len(t, hash, 64)
+}
+
+// 测试SM3解密的各种错误情况
+func TestSM3Encryptor_DecryptErrors(t *testing.T) {
+	key := make([]byte, 32)
+	encryptor, err := NewSM3Encryptor(key)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name       string
+		ciphertext []byte
+		errorMsg   string
+	}{
+		{
+			name:       "empty ciphertext",
+			ciphertext: []byte(""),
+			errorMsg:   "invalid ciphertext format",
+		},
+		{
+			name:       "single dot",
+			ciphertext: []byte("02.something"),
+			errorMsg:   "invalid ciphertext format",
+		},
+		{
+			name:       "no dots",
+			ciphertext: []byte("02something"),
+			errorMsg:   "invalid ciphertext format",
+		},
+		{
+			name:       "wrong algorithm",
+			ciphertext: []byte("01.dGVzdA==.dGVzdA=="),
+			errorMsg:   "unsupported algorithm",
+		},
+		{
+			name:       "invalid algorithm format",
+			ciphertext: []byte("abc.dGVzdA==.dGVzdA=="),
+			errorMsg:   "unsupported algorithm",
+		},
+		{
+			name:       "valid SM3 format",
+			ciphertext: []byte("02.dGVzdA==.dGVzdA=="),
+			errorMsg:   "SM3 is a hash algorithm, decryption is not supported",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			decrypted, err := encryptor.Decrypt(tt.ciphertext)
+			assert.Error(t, err)
+			assert.Nil(t, decrypted)
+			assert.Contains(t, err.Error(), tt.errorMsg)
+		})
+	}
+}
+
+// 测试SM3哈希的性能和一致性
+func TestSM3Encryptor_HashPerformance(t *testing.T) {
+	key := make([]byte, 32)
+	encryptor, err := NewSM3Encryptor(key)
+	require.NoError(t, err)
+
+	// 测试不同大小数据的哈希性能
+	sizes := []int{100, 1000, 10000, 100000}
+
+	for _, size := range sizes {
+		t.Run(fmt.Sprintf("size_%d", size), func(t *testing.T) {
+			data := make([]byte, size)
+			for i := range data {
+				data[i] = byte(i % 256)
+			}
+
+			// 多次哈希应该产生相同结果
+			hash1 := encryptor.Hash(data)
+			hash2 := encryptor.Hash(data)
+			hash3 := encryptor.Hash(data)
+
+			assert.Equal(t, hash1, hash2)
+			assert.Equal(t, hash2, hash3)
+			assert.Len(t, hash1, 64)
+		})
+	}
+}
+
+// 测试SM3并发安全性
+func TestSM3Encryptor_ConcurrentSafety(t *testing.T) {
+	key := make([]byte, 32)
+	encryptor, err := NewSM3Encryptor(key)
+	require.NoError(t, err)
+
+	const goroutines = 20
+	const iterations = 50
+
+	results := make(chan string, goroutines*iterations)
+	errors := make(chan error, goroutines*iterations)
+
+	// 并发执行哈希操作
+	for i := 0; i < goroutines; i++ {
+		go func(id int) {
+			for j := 0; j < iterations; j++ {
+				data := []byte(fmt.Sprintf("concurrent test %d-%d", id, j))
+
+				// 测试哈希
+				hash := encryptor.Hash(data)
+				if len(hash) != 64 {
+					errors <- fmt.Errorf("invalid hash length: %d", len(hash))
+					return
+				}
+				results <- hash
+
+				// 测试加密
+				ciphertext, err := encryptor.Encrypt(data)
+				if err != nil {
+					errors <- err
+					return
+				}
+				if !strings.Contains(string(ciphertext), AlgoSM3) {
+					errors <- fmt.Errorf("invalid ciphertext format")
+					return
+				}
+			}
+		}(i)
+	}
+
+	// 收集结果
+	for i := 0; i < goroutines*iterations; i++ {
+		select {
+		case <-results:
+			// 成功
+		case err := <-errors:
+			t.Fatalf("并发测试失败: %v", err)
+		case <-time.After(10 * time.Second):
+			t.Fatal("并发测试超时")
+		}
+	}
 }

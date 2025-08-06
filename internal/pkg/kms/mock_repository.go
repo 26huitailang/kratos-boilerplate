@@ -2,6 +2,7 @@ package kms
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -13,6 +14,7 @@ type MockKMSRepo struct {
 	mu       sync.RWMutex
 	dataKeys map[string]*biz.DataKey
 	activeID string
+	shouldFailCleanup bool
 }
 
 // NewMockKMSRepo 创建模拟KMS数据仓库
@@ -158,6 +160,10 @@ func (m *MockKMSRepo) UpdateKeyStatus(ctx context.Context, version string, isAct
 
 // CleanupExpiredKeys 清理过期的数据密钥
 func (m *MockKMSRepo) CleanupExpiredKeys(ctx context.Context) error {
+	if m.shouldFailCleanup {
+		return biz.ErrCleanupFailed
+	}
+	
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	
@@ -264,4 +270,35 @@ func (m *MockKMSRepo) GetKeyCount() int {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return len(m.dataKeys)
+}
+
+// GenerateDataKey 生成新的数据密钥（仅用于测试）
+func (m *MockKMSRepo) GenerateDataKey(ctx context.Context, algorithm string) (*biz.DataKey, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	
+	// 生成密钥数据
+	keyData := make([]byte, 32)
+	for i := range keyData {
+		keyData[i] = byte(i + len(m.dataKeys)) // 简单的密钥生成
+	}
+	
+	// 创建数据密钥
+	dataKey := &biz.DataKey{
+		ID:        fmt.Sprintf("key-%d", len(m.dataKeys)+1),
+		Version:   fmt.Sprintf("v%d", len(m.dataKeys)+1),
+		Algorithm: algorithm,
+		Key:       keyData,
+		IsActive:  len(m.dataKeys) == 0, // 第一个密钥设为活跃
+		CreatedAt: time.Now(),
+		ExpiresAt: time.Now().Add(24 * time.Hour),
+	}
+	
+	// 保存密钥
+	m.dataKeys[dataKey.ID] = dataKey
+	if dataKey.IsActive {
+		m.activeID = dataKey.ID
+	}
+	
+	return dataKey, nil
 }

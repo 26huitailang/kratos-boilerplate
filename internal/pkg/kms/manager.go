@@ -282,16 +282,7 @@ func (m *kmsManager) GetStatus(ctx context.Context) (*KMSStatus, error) {
 	return status, nil
 }
 
-// KMSStatus KMS系统状态
-type KMSStatus struct {
-	Initialized      bool              `json:"initialized"`
-	Shutdown         bool              `json:"shutdown"`
-	Algorithm        string            `json:"algorithm,omitempty"`
-	RotateInterval   time.Duration     `json:"rotate_interval,omitempty"`
-	ActiveKeyVersion string            `json:"active_key_version,omitempty"`
-	ActiveKeyExpiry  time.Time         `json:"active_key_expiry,omitempty"`
-	KeyStatistics    *biz.KeyStatistics  `json:"key_statistics,omitempty"`
-}
+
 
 // PerformMaintenance 执行维护操作
 func (m *kmsManager) PerformMaintenance(ctx context.Context) error {
