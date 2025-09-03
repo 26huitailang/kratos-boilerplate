@@ -1,0 +1,14 @@
+enabled: true
+priority: 20
+timeout: 30s
+retry_count: 3
+settings:
+  log_level: "info"
+  output_format: "json"
+  max_log_size: "100MB"
+  retention_days: 30
+  sensitive_data_masking: true
+metadata:
+  category: "logging"
+  author: "system"
+  version: "1.0.0"

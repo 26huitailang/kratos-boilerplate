@@ -9,6 +9,7 @@ import (
 	"kratos-boilerplate/internal/biz"
 	"kratos-boilerplate/internal/conf"
 	"kratos-boilerplate/internal/data"
+	"kratos-boilerplate/internal/pkg/plugin"
 	"kratos-boilerplate/internal/server"
 	"kratos-boilerplate/internal/service"
 
@@ -19,7 +20,7 @@ import (
 
 // wireApp init kratos application.
 func wireApp(*conf.Server, *conf.Data, *conf.Auth, log.Logger) (*kratos.App, func(), error) {
-	wire.Build(server.ProviderSet, data.ProviderSet, biz.ProviderSet, service.ProviderSet, newApp)
+	wire.Build(server.ProviderSet, data.ProviderSet, biz.ProviderSet, service.ProviderSet, plugin.ProviderSet, newApp)
 	return nil, nil, nil
 }
 

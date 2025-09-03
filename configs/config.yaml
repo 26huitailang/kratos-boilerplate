@@ -13,3 +13,13 @@ data:
     addr: 127.0.0.1:6379
     read_timeout: 0.2s
     write_timeout: 0.2s
+
+plugins:
+  enabled: true
+  directory: "./plugins"
+  config_directory: "./configs/plugins"
+  auto_load: true
+  security:
+    sandbox_enabled: true
+    max_memory: "100MB"
+    max_cpu_percent: 10
