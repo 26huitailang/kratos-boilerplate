@@ -1,6 +1,7 @@
 package server
 
 import (
+	featurev1 "kratos-boilerplate/api/feature/v1"
 	v1 "kratos-boilerplate/api/helloworld/v1"
 	"kratos-boilerplate/internal/conf"
 	"kratos-boilerplate/internal/service"
@@ -11,7 +12,7 @@ import (
 )
 
 // NewGRPCServer new a gRPC server.
-func NewGRPCServer(c *conf.Server, greeter *service.GreeterService, logger log.Logger) *grpc.Server {
+func NewGRPCServer(c *conf.Server, greeter *service.GreeterService, feature *service.FeatureToggleService, logger log.Logger) *grpc.Server {
 	var opts = []grpc.ServerOption{
 		grpc.Middleware(
 			recovery.Recovery(),
@@ -30,5 +31,6 @@ func NewGRPCServer(c *conf.Server, greeter *service.GreeterService, logger log.L
 	}
 	srv := grpc.NewServer(opts...)
 	v1.RegisterGreeterServer(srv, greeter)
+	featurev1.RegisterFeatureToggleServer(srv, feature)
 	return srv
 }

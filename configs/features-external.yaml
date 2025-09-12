@@ -1,0 +1,8 @@
+features:
+  # 临时关闭用户管理
+  user.management:
+    enabled: false
+
+  # 临时开启高级报表（覆盖OEM设置）
+  report.advanced:
+    enabled: true

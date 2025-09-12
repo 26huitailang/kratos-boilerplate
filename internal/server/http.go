@@ -2,6 +2,7 @@ package server
 
 import (
 	authv1 "kratos-boilerplate/api/auth/v1"
+	featurev1 "kratos-boilerplate/api/feature/v1"
 	v1 "kratos-boilerplate/api/helloworld/v1"
 	"kratos-boilerplate/internal/conf"
 	"kratos-boilerplate/internal/service"
@@ -12,7 +13,7 @@ import (
 )
 
 // NewHTTPServer new an HTTP server.
-func NewHTTPServer(c *conf.Server, greeter *service.GreeterService, auth *service.AuthService, logger log.Logger) *http.Server {
+func NewHTTPServer(c *conf.Server, greeter *service.GreeterService, auth *service.AuthService, feature *service.FeatureToggleService, logger log.Logger) *http.Server {
 	var opts = []http.ServerOption{
 		http.Middleware(
 			recovery.Recovery(),
@@ -32,5 +33,6 @@ func NewHTTPServer(c *conf.Server, greeter *service.GreeterService, auth *servic
 	srv := http.NewServer(opts...)
 	v1.RegisterGreeterHTTPServer(srv, greeter)
 	authv1.RegisterAuthHTTPServer(srv, auth)
+	featurev1.RegisterFeatureToggleHTTPServer(srv, feature)
 	return srv
 }

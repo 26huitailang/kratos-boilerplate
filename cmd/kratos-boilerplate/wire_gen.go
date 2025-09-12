@@ -13,6 +13,7 @@ import (
 	"kratos-boilerplate/internal/conf"
 	"kratos-boilerplate/internal/data"
 	"kratos-boilerplate/internal/pkg/captcha"
+	"kratos-boilerplate/internal/pkg/feature"
 	"kratos-boilerplate/internal/server"
 	"kratos-boilerplate/internal/service"
 )
@@ -24,7 +25,7 @@ import (
 // Injectors from wire.go:
 
 // wireApp init kratos application.
-func wireApp(confServer *conf.Server, confData *conf.Data, auth *conf.Auth, logger log.Logger) (*kratos.App, func(), error) {
+func wireApp(confServer *conf.Server, confData *conf.Data, auth *conf.Auth, bootstrap *conf.Bootstrap, logger log.Logger) (*kratos.App, func(), error) {
 	dataData, cleanup, err := data.NewData(confData, logger)
 	if err != nil {
 		return nil, nil, err
@@ -32,7 +33,12 @@ func wireApp(confServer *conf.Server, confData *conf.Data, auth *conf.Auth, logg
 	greeterRepo := data.NewGreeterRepo(dataData, logger)
 	greeterUsecase := biz.NewGreeterUsecase(greeterRepo, logger)
 	greeterService := service.NewGreeterService(greeterUsecase)
-	grpcServer := server.NewGRPCServer(confServer, greeterService, logger)
+	featureConfig := feature.NewFeatureConfig(bootstrap)
+	featureRepository := feature.NewFeatureRepository(featureConfig, logger)
+	compositeStrategy := feature.NewCompositeStrategy()
+	toggleManager := feature.NewToggleManager(featureRepository, compositeStrategy, logger)
+	featureToggleService := service.NewFeatureToggleService(toggleManager, logger)
+	grpcServer := server.NewGRPCServer(confServer, greeterService, featureToggleService, logger)
 	kmsRepo := data.NewKMSRepo(dataData, logger)
 	kmsManager := data.NewKMSManager(kmsRepo, logger)
 	userRepo, err := data.NewUserRepo(dataData, logger, kmsManager)
@@ -45,7 +51,7 @@ func wireApp(confServer *conf.Server, confData *conf.Data, auth *conf.Auth, logg
 	authConfig := biz.NewAuthConfig(auth)
 	authUsecase := biz.NewAuthUsecase(userRepo, captchaService, authConfig, logger)
 	authService := service.NewAuthService(authUsecase, logger)
-	httpServer := server.NewHTTPServer(confServer, greeterService, authService, logger)
+	httpServer := server.NewHTTPServer(confServer, greeterService, authService, featureToggleService, logger)
 	app := newApp(logger, grpcServer, httpServer)
 	return app, func() {
 		cleanup()

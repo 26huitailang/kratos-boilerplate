@@ -1,0 +1,182 @@
+syntax = "proto3";
+
+package feature.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "kratos-boilerplate/api/feature/v1;v1";
+
+// 功能开关管理服务
+service FeatureToggle {
+  // 获取所有功能开关
+  rpc ListToggles(ListTogglesRequest) returns (ListTogglesReply) {
+    option (google.api.http) = {
+      get: "/api/v1/features"
+    };
+  }
+  
+  // 获取单个功能开关
+  rpc GetToggle(GetToggleRequest) returns (GetToggleReply) {
+    option (google.api.http) = {
+      get: "/api/v1/features/{flag}"
+    };
+  }
+  
+  // 更新功能开关
+  rpc UpdateToggle(UpdateToggleRequest) returns (UpdateToggleReply) {
+    option (google.api.http) = {
+      put: "/api/v1/features/{flag}"
+      body: "*"
+    };
+  }
+  
+  // 启用功能开关
+  rpc EnableToggle(EnableToggleRequest) returns (EnableToggleReply) {
+    option (google.api.http) = {
+      post: "/api/v1/features/{flag}/enable"
+      body: "*"
+    };
+  }
+  
+  // 禁用功能开关
+  rpc DisableToggle(DisableToggleRequest) returns (DisableToggleReply) {
+    option (google.api.http) = {
+      post: "/api/v1/features/{flag}/disable"
+      body: "*"
+    };
+  }
+  
+  // 删除功能开关
+  rpc DeleteToggle(DeleteToggleRequest) returns (DeleteToggleReply) {
+    option (google.api.http) = {
+      delete: "/api/v1/features/{flag}"
+    };
+  }
+  
+  // 评估功能开关
+  rpc EvaluateToggle(EvaluateToggleRequest) returns (EvaluateToggleReply) {
+    option (google.api.http) = {
+      post: "/api/v1/features/{flag}/evaluate"
+      body: "*"
+    };
+  }
+  
+  // 获取功能开关统计
+  rpc GetStats(GetStatsRequest) returns (GetStatsReply) {
+    option (google.api.http) = {
+      get: "/api/v1/features/stats"
+    };
+  }
+}
+
+// 功能开关策略
+enum FeatureStrategy {
+  SIMPLE = 0;
+  PERCENTAGE = 1;
+  USER = 2;
+  TIME = 3;
+  ENVIRONMENT = 4;
+}
+
+// 功能开关配置
+message ToggleConfig {
+  bool enabled = 1;
+  FeatureStrategy strategy = 2;
+  map<string, string> rules = 3;
+  string description = 4;
+  repeated string tags = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+}
+
+// 评估上下文
+message EvaluationContext {
+  string user_id = 1;
+  string user_type = 2;
+  string environment = 3;
+  string version = 4;
+  map<string, string> attributes = 5;
+}
+
+// 功能开关信息
+message FeatureToggleInfo {
+  string flag = 1;
+  ToggleConfig config = 2;
+}
+
+// 请求和响应消息
+
+message ListTogglesRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+  repeated string tags = 3;
+  optional bool enabled_only = 4;
+}
+
+message ListTogglesReply {
+  repeated FeatureToggleInfo toggles = 1;
+  int32 total = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}
+
+message GetToggleRequest {
+  string flag = 1;
+}
+
+message GetToggleReply {
+  FeatureToggleInfo toggle = 1;
+}
+
+message UpdateToggleRequest {
+  string flag = 1;
+  ToggleConfig config = 2;
+}
+
+message UpdateToggleReply {
+  FeatureToggleInfo toggle = 1;
+}
+
+message EnableToggleRequest {
+  string flag = 1;
+}
+
+message EnableToggleReply {
+  FeatureToggleInfo toggle = 1;
+}
+
+message DisableToggleRequest {
+  string flag = 1;
+}
+
+message DisableToggleReply {
+  FeatureToggleInfo toggle = 1;
+}
+
+message DeleteToggleRequest {
+  string flag = 1;
+}
+
+message DeleteToggleReply {
+  bool success = 1;
+}
+
+message EvaluateToggleRequest {
+  string flag = 1;
+  EvaluationContext context = 2;
+}
+
+message EvaluateToggleReply {
+  bool enabled = 1;
+  string reason = 2;
+}
+
+message GetStatsRequest {}
+
+message GetStatsReply {
+  int32 total_toggles = 1;
+  int32 enabled_count = 2;
+  int32 disabled_count = 3;
+  map<string, int32> strategies = 4;
+}
