@@ -96,44 +96,89 @@ type EvaluationContext struct {
 	Attributes  map[string]string `json:"attributes"`
 }
 
-// HierarchicalFeatureToggle 分层功能开关管理接口
-type HierarchicalFeatureToggle interface {
-	// 基本功能检查
+// FeatureChecker 基础功能检查接口
+type FeatureChecker interface {
+	// IsEnabled 检查功能是否启用
 	IsEnabled(ctx context.Context, flag FeatureFlag) bool
+	// IsEnabledWithContext 基于上下文检查功能是否启用
 	IsEnabledWithContext(ctx context.Context, flag FeatureFlag, evalCtx *EvaluationContext) bool
+}
 
-	// 分层功能检查
+// HierarchicalChecker 分层功能检查接口
+type HierarchicalChecker interface {
+	// IsFeatureEnabled 检查分层功能是否启用
 	IsFeatureEnabled(featurePath string) bool
+	// IsDomainEnabled 检查功能域是否有任何启用的功能
 	IsDomainEnabled(domain string) bool
+	// GetDomainFeatures 获取域下的所有功能
 	GetDomainFeatures(domain string) []string
+	// GetFeatureTree 获取功能树结构
 	GetFeatureTree() map[string][]string
+}
 
-	// 功能集合能力检查
+// CapabilityChecker 能力检查接口
+type CapabilityChecker interface {
+	// HasPermission 检查功能集合中是否包含指定权限
 	HasPermission(featurePath, permission string) bool
+	// HasAPI 检查功能集合中是否包含指定API
 	HasAPI(featurePath, api string) bool
+	// HasRoute 检查功能集合中是否包含指定路由
 	HasRoute(featurePath, route string) bool
+	// HasConfig 检查功能集合中是否包含指定配置
 	HasConfig(featurePath, config string) bool
+	// HasAuditLog 检查功能集合中是否包含指定审计日志
 	HasAuditLog(featurePath, logType string) bool
-
-	// 批量检查
-	IsAnyFeatureEnabled(featurePaths ...string) bool
-	AreAllFeaturesEnabled(featurePaths ...string) bool
-
-	// 功能集合管理
+	// GetFeatureCapabilities 获取功能集合的能力
 	GetFeatureCapabilities(featurePath string) *FeatureCapabilities
+}
+
+// BatchChecker 批量检查接口
+type BatchChecker interface {
+	// IsAnyFeatureEnabled 检查是否有任何功能启用
+	IsAnyFeatureEnabled(featurePaths ...string) bool
+	// AreAllFeaturesEnabled 检查是否所有功能都启用
+	AreAllFeaturesEnabled(featurePaths ...string) bool
+}
+
+// FeatureManager 功能管理接口
+type FeatureManager interface {
+	// GetToggleConfig 获取功能开关配置
 	GetToggleConfig(flag FeatureFlag) (*ToggleConfig, error)
+	// UpdateToggle 更新功能开关配置
 	UpdateToggle(flag FeatureFlag, config *ToggleConfig) error
+	// ListToggles 列出所有功能开关
 	ListToggles() map[FeatureFlag]*ToggleConfig
+	// EnableFeature 启用功能
 	EnableFeature(flag FeatureFlag) error
+	// DisableFeature 禁用功能
 	DisableFeature(flag FeatureFlag) error
+	// DeleteToggle 删除功能开关
 	DeleteToggle(flag FeatureFlag) error
+}
 
-	// 事件订阅
+// EventManager 事件管理接口
+type EventManager interface {
+	// Subscribe 订阅功能开关变更事件
 	Subscribe(callback ToggleChangeCallback) error
+	// Unsubscribe 取消订阅功能开关变更事件
 	Unsubscribe(callback ToggleChangeCallback) error
+}
 
-	// 导出功能
+// ExportManager 导出管理接口
+type ExportManager interface {
+	// ExportCSV 导出CSV格式的功能集合信息
 	ExportCSV() ([]byte, error)
+}
+
+// HierarchicalFeatureToggle 分层功能开关管理接口（组合接口，保持向后兼容）
+type HierarchicalFeatureToggle interface {
+	FeatureChecker
+	HierarchicalChecker
+	CapabilityChecker
+	BatchChecker
+	FeatureManager
+	EventManager
+	ExportManager
 }
 
 // FeatureToggle 功能开关管理接口 (向后兼容)

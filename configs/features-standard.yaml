@@ -1,0 +1,188 @@
+apiVersion: v1
+kind: FeatureConfiguration
+metadata:
+  name: kratos-boilerplate-features
+  version: "1.0.0"
+  description: "功能裁剪系统标准化配置示例"
+  createdAt: "2024-01-01T00:00:00Z"
+  updatedAt: "2024-01-01T00:00:00Z"
+  owner: "feature-team"
+  tags:
+    - "production"
+    - "feature-toggle"
+  labels:
+    environment: "production"
+    version: "v1.0.0"
+  annotations:
+    documentation: "https://docs.example.com/features"
+    contact: "feature-team@example.com"
+
+spec:
+  # 功能定义
+  features:
+    user.management:
+      enabled: true
+      strategy: simple
+      metadata:
+        description: "用户管理功能集合"
+        tags: ["user", "admin"]
+        owner: "user-team"
+        priority: "high"
+        environments: ["production", "staging"]
+        documentation: "https://docs.example.com/user-management"
+        contactInfo: "user-team@example.com"
+        labels:
+          domain: "user"
+          category: "management"
+      capabilities:
+        permissions:
+          - "user.create"
+          - "user.update"
+          - "user.delete"
+          - "user.list"
+        apis:
+          - "POST /api/v1/users"
+          - "PUT /api/v1/users/{id}"
+          - "DELETE /api/v1/users/{id}"
+          - "GET /api/v1/users"
+        routes:
+          - "/admin/users"
+          - "/admin/users/create"
+          - "/admin/users/edit"
+        configs:
+          - "user.max_count"
+          - "user.password_policy"
+        auditLogs:
+          - "user_created"
+          - "user_updated"
+          - "user_deleted"
+      dependencies: []
+      
+    user.profile:
+      enabled: true
+      strategy: percentage
+      rules:
+        percentage: 50
+        environments: ["production"]
+      metadata:
+        description: "用户个人资料功能"
+        tags: ["user", "profile"]
+        owner: "user-team"
+        priority: "medium"
+        environments: ["production", "staging", "development"]
+      capabilities:
+        permissions:
+          - "profile.view"
+          - "profile.edit"
+        apis:
+          - "GET /api/v1/profile"
+          - "PUT /api/v1/profile"
+        routes:
+          - "/profile"
+          - "/profile/edit"
+        configs:
+          - "profile.avatar_size"
+        auditLogs:
+          - "profile_viewed"
+          - "profile_updated"
+      dependencies:
+        - "user.management"
+        
+    system.monitoring:
+      enabled: false
+      strategy: environment
+      rules:
+        environments: ["development", "staging"]
+      metadata:
+        description: "系统监控功能"
+        tags: ["system", "monitoring"]
+        owner: "ops-team"
+        priority: "low"
+        environments: ["development", "staging"]
+      capabilities:
+        permissions:
+          - "monitoring.view"
+          - "monitoring.export"
+        apis:
+          - "GET /api/v1/monitoring/health"
+          - "GET /api/v1/monitoring/metrics"
+        routes:
+          - "/admin/monitoring"
+        configs:
+          - "monitoring.interval"
+          - "monitoring.retention"
+        auditLogs:
+          - "monitoring_accessed"
+      deprecation:
+        deprecated: true
+        deprecatedAt: "2024-01-01T00:00:00Z"
+        removalDate: "2024-06-01T00:00:00Z"
+        reason: "功能迁移到新的监控系统"
+        replacement: "system.observability"
+        migrationGuide: "https://docs.example.com/migration/monitoring"
+
+  # 默认设置
+  defaults:
+    strategy: simple
+    enabled: false
+    description: "默认功能配置"
+    owner: "platform-team"
+    tags: ["default"]
+    ttl: "24h"
+    rules:
+      environments: ["development"]
+
+  # 验证规则
+  validation:
+    strict: false
+    requiredFields:
+      - "enabled"
+      - "strategy"
+      - "metadata.description"
+      - "metadata.owner"
+    allowedStrategies:
+      - "simple"
+      - "percentage"
+      - "user"
+      - "time"
+      - "environment"
+    allowedEnvironments:
+      - "development"
+      - "staging"
+      - "production"
+    featureNamePattern: "^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*)*$"
+    maxFeatures: 1000
+    maxRulesPerFeature: 10
+    maxCapabilitiesPerType: 100
+    requireOwnership: true
+    requireDocumentation: true
+
+  # 策略配置
+  policies:
+    autoCleanup:
+      enabled: false
+      retentionPeriod: "720h" # 30天
+      cleanupUnusedFeatures: false
+      cleanupDeprecated: true
+      
+    deprecationPolicy:
+      minDeprecationPeriod: "720h" # 30天
+      requireReason: true
+      requireReplacement: false
+      notificationPeriod: "168h" # 7天
+      
+    accessControl:
+      requireApproval: false
+      approvalRequired: []
+      readOnlyUsers: ["readonly-user"]
+      adminUsers: ["admin-user", "platform-team"]
+      environmentRestrictions:
+        production: ["admin-user", "platform-team"]
+        staging: ["admin-user", "platform-team", "dev-team"]
+        
+    changeManagement:
+      requireChangeLog: true
+      requireTestPlan: false
+      rollbackTimeout: "5m"
+      gradualRollout: true
+      canaryPercentage: 10.0

@@ -208,41 +208,6 @@ func (cbd *CircuitBreakerDecorator) WithCircuitBreaker(
 	}
 }
 
-// ExtractEvaluationContext 从上下文中提取评估上下文
-func ExtractEvaluationContext(ctx context.Context) *EvaluationContext {
-	// 尝试从上下文中获取用户信息
-	evalCtx := &EvaluationContext{
-		Environment: "production",
-		Version:     "1.0.0",
-		Attributes:  make(map[string]string),
-	}
-
-	// 从transport context中提取信息
-	if info, ok := transport.FromServerContext(ctx); ok {
-		evalCtx.Attributes["operation"] = info.Operation()
-		if endpoint := info.Endpoint(); endpoint != "" {
-			evalCtx.Attributes["endpoint"] = endpoint
-		}
-	}
-
-	// 尝试从上下文中获取用户ID（这需要根据具体的认证实现来调整）
-	if userID, ok := ctx.Value("user_id").(string); ok {
-		evalCtx.UserID = userID
-	}
-
-	// 尝试从上下文中获取用户类型
-	if userType, ok := ctx.Value("user_type").(string); ok {
-		evalCtx.UserType = userType
-	}
-
-	// 尝试从上下文中获取环境信息
-	if env, ok := ctx.Value("environment").(string); ok {
-		evalCtx.Environment = env
-	}
-
-	return evalCtx
-}
-
 // mapPathToFeature 将请求路径映射到功能开关
 func mapPathToFeature(operation string) FeatureFlag {
 	pathFeatureMap := map[string]FeatureFlag{
