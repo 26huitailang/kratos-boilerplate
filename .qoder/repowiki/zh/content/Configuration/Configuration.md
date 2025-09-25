@@ -8,13 +8,16 @@
 - [audit_logger.yaml](file://configs/plugins/audit_logger.yaml)
 - [auth_enhancer.yaml](file://configs/plugins/auth_enhancer.yaml)
 - [wire.go](file://internal/pkg/feature/wire.go)
+- [config.go](file://internal/pkg/config/config.go) - *在最近提交中更新*
+- [validator.go](file://internal/pkg/config/validator.go) - *在最近提交中新增*
 </cite>
 
 ## 更新摘要
 **已做更改**   
-- 更新了“功能开关配置”部分以反映最新的代码变更
-- 添加了关于功能开关系统默认值处理的新内容
-- 增强了配置加载和验证部分的细节
+- 根据最新代码变更全面更新了“主配置文件结构”部分
+- 新增了关于配置热更新和多源加载机制的内容
+- 增强了配置验证机制的详细说明
+- 更新了配置加载过程的序列图以反映实际实现
 - 所有引用文件路径均已更新并标注最新提交状态
 
 ## 目录
@@ -34,7 +37,7 @@
 kratos-boilerplate 项目实现了一个基于 Protobuf 定义和 Kratos 框架的模块化、可扩展的配置系统。本文档全面概述了该配置架构，详细说明了配置如何在不同环境中进行结构化、加载、验证和应用。该系统支持分层配置合并、插件特定设置、基于环境的覆盖以及动态功能开关，从而实现灵活部署于开发、测试和生产环境。
 
 **Section sources**
-- [config.yaml](file://configs/config.yaml#L1-L38)
+- [config.yaml](file://configs/config.yaml#L1-L47)
 - [conf.proto](file://internal/conf/conf.proto#L1-L70)
 
 ## 主配置文件结构
@@ -78,6 +81,73 @@ data:
     addr: 127.0.0.1:6379
     read_timeout: 0.2s
     write_timeout: 0.2s
+```
+
+### 认证配置
+`auth` 部分配置认证相关参数。
+
+**Labels:**
+- `auth.jwt_secret_key`: JWT 密钥，必须至少16个字符
+- `auth.access_token_expiration`: 访问令牌过期时间
+- `auth.refresh_token_expiration`: 刷新令牌过期时间
+- `auth.captcha_enabled`: 是否启用验证码
+- `auth.captcha_expiration`: 验证码过期时间
+- `auth.max_login_attempts`: 最大登录尝试次数
+- `auth.lock_duration`: 账户锁定持续时间
+- `auth.totp_enabled`: 是否启用 TOTP 双因素认证
+
+```yaml
+auth:
+  jwt_secret_key: "your-super-secret-jwt-key-here"
+  access_token_expiration: "24h"
+  refresh_token_expiration: "7d"
+  captcha_enabled: true
+  captcha_expiration: "5m"
+  max_login_attempts: 5
+  lock_duration: "30m"
+  totp_enabled: false
+```
+
+### 日志配置
+`log` 部分配置日志记录行为。
+
+**Labels:**
+- `log.level`: 日志级别（debug, info, warn, error, fatal）
+- `log.format`: 输出格式（json, text）
+- `log.output`: 输出目标（stdout, file）
+- `log.file.path`: 日志文件路径
+- `log.file.max_size`: 单个日志文件最大大小（MB）
+- `log.file.max_backups`: 保留的旧日志文件最大数量
+- `log.file.max_age`: 保留旧日志文件的最大天数
+- `log.file.compress`: 是否压缩归档日志
+
+```yaml
+log:
+  level: info
+  format: json
+  output: stdout
+  file:
+    path: /var/log/app.log
+    max_size: 100
+    max_backups: 3
+    max_age: 28
+    compress: true
+```
+
+### 链路追踪配置
+`tracing` 部分配置分布式追踪。
+
+**Labels:**
+- `tracing.enabled`: 是否启用链路追踪
+- `tracing.jaeger.endpoint`: Jaeger 收集器端点
+- `tracing.jaeger.sample_rate`: 采样率（0.0-1.0）
+
+```yaml
+tracing:
+  enabled: true
+  jaeger:
+    endpoint: "http://jaeger-collector:14268/api/traces"
+    sample_rate: 0.1
 ```
 
 ### 插件系统配置
@@ -131,36 +201,39 @@ features:
 ```
 
 **Section sources**
-- [config.yaml](file://configs/config.yaml#L1-L38)
-- [conf.proto](file://internal/conf/conf.proto#L1-L70)
+- [config.yaml](file://configs/config.yaml#L1-L47)
+- [config.go](file://internal/pkg/config/config.go#L32-L87)
 
 ## 配置加载与验证
 配置系统遵循结构化的初始化过程，通过 Protobuf 消息定义确保类型安全和验证。
 
 ### 配置加载过程
-应用程序通过 Kratos 配置框架加载配置，该框架支持多种源和热重载。
+应用程序通过增强的配置管理器加载配置，该管理器支持多种源、环境特定配置和热更新。
 
 ```mermaid
 sequenceDiagram
 participant Main as main.go
-participant Config as config.New()
+participant ConfigManager as NewManager()
 participant FileSource as file.NewSource()
-participant Scanner as c.Scan()
-Main->>Config : 初始化配置管理器
-Config->>FileSource : 注册带有路径的文件源
-Main->>Config : c.Load()
-FileSource->>Main : 加载YAML文件
-Main->>Scanner : c.Scan(&Bootstrap)
-Scanner->>Main : 填充Protobuf消息
-Main->>App : 将配置传递给wireApp
+participant EnvSource as env.NewSource()
+participant Watcher as fsnotify.Watcher
+Main->>ConfigManager : 创建配置管理器
+ConfigManager->>FileSource : 添加主配置文件源
+ConfigManager->>FileSource : 添加环境特定配置文件源(如果存在)
+ConfigManager->>EnvSource : 添加环境变量源(KRATOS_前缀)
+ConfigManager->>Watcher : 启动文件监听器
+Main->>ConfigManager : Load()
+FileSource->>ConfigManager : 加载YAML文件
+EnvSource->>ConfigManager : 覆盖环境变量值
+ConfigManager->>Main : 返回配置实例
 ```
 
 **Diagram sources**
 - [main.go](file://cmd/kratos-boilerplate/main.go#L53-L90)
-- [conf.proto](file://internal/conf/conf.proto#L1-L10)
+- [config.go](file://internal/pkg/config/config.go#L112-L146)
 
-### 通过 Protobuf 进行验证
-配置验证通过 `conf.proto` 中的 Protobuf 模式强制执行，该模式定义了严格的数据类型和结构。
+### 通过 Protobuf 和结构体标签进行验证
+配置验证通过 `conf.proto` 中的 Protobuf 模式和 Go 结构体标签双重强制执行，确保数据完整性和安全性。
 
 ```mermaid
 classDiagram
@@ -168,6 +241,8 @@ class Bootstrap {
 +Server server
 +Data data
 +Auth auth
++Log log
++Tracing tracing
 +Features features
 }
 class Server {
@@ -177,6 +252,21 @@ class Server {
 class Data {
 +Database database
 +Redis redis
+}
+class Auth {
++string jwt_secret_key
++time.Duration access_token_expiration
++int max_login_attempts
+}
+class Log {
++string level
++string format
++string output
++LogFile file
+}
+class Tracing {
++bool enabled
++Jaeger jaeger
 }
 class Features {
 +bool enabled
@@ -191,24 +281,42 @@ class FeatureRepository {
 +string config_path
 +string format
 }
+class LogFile {
++string path
++int max_size
++int max_backups
++int max_age
++bool compress
+}
+class Jaeger {
++string endpoint
++float64 sample_rate
+}
 Bootstrap --> Server
 Bootstrap --> Data
+Bootstrap --> Auth
+Bootstrap --> Log
+Bootstrap --> Tracing
 Bootstrap --> Features
 Features --> FeatureRepository
+Log --> LogFile
+Tracing --> Jaeger
 ```
 
 **Diagram sources**
 - [conf.proto](file://internal/conf/conf.proto#L1-L70)
+- [config.go](file://internal/pkg/config/config.go#L32-L87)
 
-Protobuf 基础方法确保：
-- 通过生成的 Go 结构体实现类型安全
-- 必填字段验证
-- 正确的持续时间解析（例如，“1s”，“0.2s”）
-- 强制执行结构化数据层次结构
+验证机制包括：
+- **必填字段验证**: 使用 `validate:"required"` 标签确保关键字段存在
+- **值范围验证**: 使用 `min`, `max` 标签限制数值范围
+- **枚举验证**: 使用 `oneof` 标签限制字符串值
+- **自定义验证**: 实现端口、持续时间等特殊格式验证
+- **默认值设置**: 在验证后应用合理的默认值
 
 **Section sources**
-- [main.go](file://cmd/kratos-boilerplate/main.go#L53-L90)
-- [conf.proto](file://internal/conf/conf.proto#L1-L70)
+- [config.go](file://internal/pkg/config/config.go#L32-L87)
+- [validator.go](file://internal/pkg/config/validator.go#L1-L321)
 
 ## 插件特定配置
 插件系统支持每个插件的独立配置文件，从而实现模块化和隔离的设置管理。
@@ -295,16 +403,16 @@ metadata:
 配置系统支持环境变量覆盖，允许在不修改配置文件的情况下进行运行时自定义。
 
 ### 覆盖机制
-可以使用点分隔路径表示法转换为下划线的环境变量来覆盖任何配置值：
+可以使用点分隔路径表示法转换为下划线的环境变量来覆盖任何配置值，并带有 `KRATOS_` 前缀：
 
-- `server.http.addr` → `SERVER_HTTP_ADDR`
-- `data.database.source` → `DATA_DATABASE_SOURCE`
-- `features.enabled` → `FEATURES_ENABLED`
+- `server.http.addr` → `KRATOS_SERVER_HTTP_ADDR`
+- `data.database.source` → `KRATOS_DATA_DATABASE_SOURCE`
+- `features.enabled` → `KRATOS_FEATURES_ENABLED`
 
 例如：
 ```bash
-export SERVER_HTTP_ADDR="0.0.0.0:8080"
-export DATA_DATABASE_SOURCE="postgresql://user:pass@prod-db:5432/prod"
+export KRATOS_SERVER_HTTP_ADDR="0.0.0.0:8080"
+export KRATOS_DATA_DATABASE_SOURCE="postgresql://user:pass@prod-db:5432/prod"
 ```
 
 ### 命令行配置路径
@@ -326,6 +434,7 @@ flag.StringVar(&flagconf, "conf", "../../configs", "config path, eg: -conf confi
 
 **Section sources**
 - [main.go](file://cmd/kratos-boilerplate/main.go#L48-L50)
+- [config.go](file://internal/pkg/config/config.go#L112-L146)
 
 ## 不同环境的配置
 该系统通过专用配置文件和功能开关管理支持多种部署环境。
@@ -339,6 +448,8 @@ configs/
 ├── features.prod.yaml
 └── features.yaml
 ```
+
+配置管理器会自动查找并加载环境特定配置文件（如 `config.dev.yaml`），如果存在则将其与主配置合并。
 
 ### 功能开关环境策略
 功能系统通过 `EnvironmentStrategy` 支持基于环境的激活：
@@ -382,6 +493,7 @@ features:
 **Section sources**
 - [wire.go](file://internal/pkg/feature/wire.go#L82-L119)
 - [strategies_test.go](file://internal/pkg/feature/strategies_test.go#L230-L279)
+- [config.go](file://internal/pkg/config/config.go#L112-L146)
 
 ## 敏感值的安全最佳实践
 配置系统实施了多项安全措施来保护敏感信息。
@@ -403,8 +515,8 @@ features:
 
 安全部署模式示例：
 ```bash
-export DATA_DATABASE_SOURCE="postgresql://app-user:$(cat /secrets/db-password)@db:5432/app"
-export AUTH_JWT_SECRET_KEY="$(cat /secrets/jwt-key)"
+export KRATOS_DATA_DATABASE_SOURCE="postgresql://app-user:$(cat /secrets/db-password)@db:5432/app"
+export KRATOS_AUTH_JWT_SECRET_KEY="$(cat /secrets/jwt-key)"
 ./kratos-boilerplate -conf ./configs/config.yaml
 ```
 
@@ -418,7 +530,7 @@ plugins:
 ```
 
 **Section sources**
-- [config.yaml](file://configs/config.yaml#L1-L38)
+- [config.yaml](file://configs/config.yaml#L1-L47)
 - [conf.proto](file://internal/conf/conf.proto#L1-L70)
 
 ## 跨环境的配置管理
@@ -428,9 +540,10 @@ plugins:
 系统遵循分层配置模式：
 
 1. **基础配置**: `config.yaml` - 所有环境的通用设置
-2. **功能配置**: `features.yaml` - 功能开关状态
-3. **环境覆盖**: 环境变量 - 特定于部署的值
-4. **插件配置**: 插件特定设置
+2. **环境覆盖**: `config.{env}.yaml` - 环境特定的覆盖
+3. **功能配置**: `features.yaml` - 功能开关状态
+4. **环境变量**: 运行时覆盖，最高优先级
+5. **插件配置**: 插件特定设置
 
 ### 环境提升策略
 推荐的配置提升工作流程：
@@ -444,16 +557,16 @@ style B fill:#ff9,stroke:#333
 style C fill:#f99,stroke:#333
 subgraph "配置管理"
 D["config.yaml - 基础设置"]
-E["features.dev.yaml - 开发功能"]
-F["features.staging.yaml - 预生产功能"]
-G["features.prod.yaml - 生产功能"]
+E["config.dev.yaml - 开发覆盖"]
+F["config.staging.yaml - 预生产覆盖"]
+G["config.prod.yaml - 生产覆盖"]
 end
 ```
 
 **Diagram sources**
-- [config.yaml](file://configs/config.yaml#L1-L38)
-- [features.dev.yaml](file://configs/features.dev.yaml)
-- [features.prod.yaml](file://configs/features.prod.yaml)
+- [config.yaml](file://configs/config.yaml#L1-L47)
+- [config.dev.yaml](file://configs/config.dev.yaml)
+- [config.prod.yaml](file://configs/config.prod.yaml)
 
 关键实践：
 - 维护一致的基础配置
@@ -463,13 +576,14 @@ end
 - 实施配置版本控制
 
 **Section sources**
-- [config.yaml](file://configs/config.yaml#L1-L38)
+- [config.yaml](file://configs/config.yaml#L1-L47)
+- [config.go](file://internal/pkg/config/config.go#L112-L146)
 
 ## 配置变更的验证
 正确验证配置变更可以防止运行时错误和服务中断。
 
 ### 静态验证
-基于 Protobuf 的配置提供编译时和加载时验证：
+基于 Protobuf 和结构体标签的配置提供编译时和加载时验证：
 
 ```go
 var bc conf.Bootstrap
@@ -485,17 +599,16 @@ if err := c.Scan(&bc); err != nil {
 - 无未知字段
 
 ### 动态验证
-功能系统执行运行时验证：
+配置管理器执行运行时验证和默认值设置：
 
 ```go
-func (config *FeatureConfig) Validate() error {
-    if config.Enabled && config.ConfigFile == "" {
-        return errors.New("启用功能时必须提供配置文件路径")
+func (m *Manager) Validate() error {
+    var cfg Config
+    if err := m.config.Scan(&cfg); err != nil {
+        return fmt.Errorf("failed to scan config: %w", err)
     }
-    if config.Repository.Type != "file" && config.Repository.Type != "redis" && config.Repository.Type != "database" {
-        return fmt.Errorf("不支持的存储库类型: %s", config.Repository.Type)
-    }
-    return nil
+    
+    return m.validator.Validate(&cfg)
 }
 ```
 
@@ -510,6 +623,7 @@ func (config *FeatureConfig) Validate() error {
 **Section sources**
 - [main.go](file://cmd/kratos-boilerplate/main.go#L68-L71)
 - [wire.go](file://internal/pkg/feature/wire.go#L42-L80)
+- [validator.go](file://internal/pkg/config/validator.go#L1-L321)
 
 ## 常见配置场景
 
@@ -572,7 +686,7 @@ settings:
 ```
 
 **Section sources**
-- [config.yaml](file://configs/config.yaml#L1-L38)
+- [config.yaml](file://configs/config.yaml#L1-L47)
 - [features.yaml](file://configs/features.yaml)
 
 ## 配置问题排查
@@ -590,19 +704,19 @@ settings:
 - **检查**: 确保正确的缩进和引号
 
 **问题：缺少必填字段**
-- **症状**: `panic: proto: wrong wireType`
-- **解决方案**: 与 `conf.proto` 结构进行比较
-- **检查**: 必填字段如 `server.http.addr`
+- **症状**: `configuration validation failed: field 'jwt_secret_key' is required`
+- **解决方案**: 与 `config.go` 结构进行比较
+- **检查**: 必填字段如 `server.http.addr`, `auth.jwt_secret_key`
 
 **问题：环境变量未应用**
 - **症状**: 配置使用默认值而不是环境覆盖
-- **解决方案**: 验证环境变量命名约定
-- **检查**: `printenv | grep SERVER` 以确认变量已设置
+- **解决方案**: 验证环境变量命名约定（需 `KRATOS_` 前缀）
+- **检查**: `printenv | grep KRATOS` 以确认变量已设置
 
 ### 诊断命令
 ```bash
 # 检查当前环境变量
-printenv | grep -E "(SERVER|DATA|FEATURES)"
+printenv | grep KRATOS
 
 # 测试配置加载
 ./kratos-boilerplate -conf ./configs/config.yaml
@@ -617,10 +731,11 @@ yamllint configs/config.yaml
 ### 调试技巧
 1. 启用详细日志以查看配置加载过程
 2. 使用 `c.Load()` 返回值检测加载问题
-3. 验证配置结构是否符合 `conf.proto`
+3. 验证配置结构是否符合 `config.go` 定义
 4. 单独测试环境变量覆盖
 5. 检查文件路径是否相对于工作目录
 
 **Section sources**
 - [main.go](file://cmd/kratos-boilerplate/main.go#L65-L68)
-- [config.yaml](file://configs/config.yaml#L1-L38)
+- [config.yaml](file://configs/config.yaml#L1-L47)
+- [config.go](file://internal/pkg/config/config.go#L112-L146)

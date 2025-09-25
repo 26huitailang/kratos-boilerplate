@@ -1,0 +1,189 @@
+# Swagger UI 安全配置示例
+# 用于不同环境的Swagger UI访问控制
+
+# 基础安全配置
+swagger_ui:
+  security:
+    # 是否启用认证保护
+    enable_auth: true
+    
+    # IP白名单配置
+    # 支持单个IP、IP段(CIDR)或通配符
+    allowed_ips:
+      - "127.0.0.1"          # 本地访问
+      - "192.168.1.0/24"     # 本地网段
+      - "10.0.0.0/8"         # 内网段
+    
+    # 允许访问的用户类型
+    allowed_user_types:
+      - "admin"              # 管理员
+      - "developer"          # 开发者
+      - "devops"             # 运维人员
+    
+    # 是否启用访问审计日志
+    enable_audit_log: true
+    
+    # 自定义访问路径前缀
+    path_prefix: "/q/"
+    
+    # JWT认证配置
+    jwt:
+      # 是否验证token过期时间
+      check_expiry: true
+      
+      # 是否验证签发者
+      check_issuer: true
+      
+      # 允许的签发者列表
+      allowed_issuers:
+        - "kratos-boilerplate"
+        - "auth-service"
+
+# 环境特定配置覆盖
+environments:
+  # 开发环境 - 最宽松的安全策略
+  development:
+    swagger_ui:
+      security:
+        enable_auth: false
+        allowed_ips: []        # 不限制IP
+        allowed_user_types: [] # 不限制用户类型
+        enable_audit_log: false
+        
+  # 测试环境 - 适中的安全策略
+  staging:
+    swagger_ui:
+      security:
+        enable_auth: true
+        allowed_ips:
+          - "10.0.0.0/8"       # 内网访问
+          - "172.16.0.0/16"    # 测试网段
+        allowed_user_types:
+          - "admin"
+          - "developer"
+          - "tester"
+          - "qa"
+        enable_audit_log: true
+        
+  # 预发布环境 - 较严格的安全策略
+  pre-production:
+    swagger_ui:
+      security:
+        enable_auth: true
+        allowed_ips:
+          - "172.16.0.100"     # 指定机器
+          - "172.16.0.101"
+          - "172.16.1.0/24"    # 运维网段
+        allowed_user_types:
+          - "admin"
+          - "devops"
+        enable_audit_log: true
+        
+  # 生产环境 - 最严格的安全策略
+  production:
+    swagger_ui:
+      security:
+        enable_auth: true
+        allowed_ips:
+          - "172.16.0.100"     # 运维跳板机
+          - "172.16.0.101"     # 备用跳板机
+        allowed_user_types:
+          - "admin"            # 仅管理员
+        enable_audit_log: true
+        jwt:
+          check_expiry: true
+          check_issuer: true
+          allowed_issuers:
+            - "production-auth-service"
+
+# 功能开关配置
+feature_toggles:
+  swagger_ui:
+    # 基础开关配置
+    enabled: true
+    strategy: "environment"
+    
+    # 环境规则
+    rules:
+      environments:
+        - "development"
+        - "staging"
+        # 注意：生产环境默认不包含，需要手动启用
+    
+    # 描述信息
+    description: "Swagger UI访问控制"
+    tags: ["api", "documentation", "security"]
+    
+    # 安全策略
+    security_policy:
+      # 最大同时访问用户数
+      max_concurrent_users: 10
+      
+      # 访问频率限制（每分钟）
+      rate_limit_per_minute: 60
+      
+      # 会话超时时间（分钟）
+      session_timeout: 30
+      
+      # 是否记录敏感操作
+      log_sensitive_operations: true
+
+# 监控和告警配置
+monitoring:
+  swagger_ui:
+    # 访问指标
+    metrics:
+      enabled: true
+      labels:
+        - "environment"
+        - "user_type"
+        - "client_ip"
+    
+    # 告警规则
+    alerts:
+      # 生产环境启用告警
+      production_access:
+        enabled: true
+        condition: "environment == 'production' AND swagger_ui_enabled == true"
+        severity: "warning"
+        message: "Swagger UI在生产环境中被访问"
+        
+      # 异常访问告警
+      unauthorized_access:
+        enabled: true
+        condition: "swagger_ui_auth_failures > 5 in 5m"
+        severity: "critical"
+        message: "Swagger UI出现大量认证失败"
+        
+      # 高频访问告警
+      high_frequency_access:
+        enabled: true
+        condition: "swagger_ui_requests > 100 in 1m"
+        severity: "warning"
+        message: "Swagger UI访问频率异常"
+
+# 日志配置
+logging:
+  swagger_ui:
+    # 访问日志级别
+    access_log_level: "info"
+    
+    # 认证失败日志级别
+    auth_failure_log_level: "warn"
+    
+    # 记录的字段
+    log_fields:
+      - "timestamp"
+      - "client_ip"
+      - "user_agent"
+      - "user_id"
+      - "user_type"
+      - "endpoint"
+      - "response_status"
+      - "response_time"
+      
+    # 敏感信息脱敏
+    sensitive_data_masking:
+      enabled: true
+      mask_user_agent: false
+      mask_ip: false          # 在生产环境可能需要设为true

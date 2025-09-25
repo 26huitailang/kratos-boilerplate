@@ -1,26 +1,39 @@
-# User Register
+# 用户注册
 
 <cite>
-**Referenced Files in This Document**   
-- [auth.proto](file://api/auth/v1/auth.proto)
-- [auth.go](file://internal/biz/auth.go)
-- [auth.go](file://internal/service/auth.go)
-- [validate.proto](file://third_party/validate/validate.proto)
+**本文档引用的文件**   
+- [auth.proto](file://api/auth/v1/auth.proto) - *在最近提交中更新*
+- [auth.go](file://internal/biz/auth.go) - *在最近提交中更新*
+- [auth.go](file://internal/service/auth.go) - *在最近提交中更新*
+- [auth.go](file://internal/data/auth.go) - *在最近提交中更新*
+- [validate.proto](file://third_party/validate/validate.proto) - *验证规则定义*
 </cite>
 
-## Table of Contents
-1. [User Register](#user-register)
-2. [HTTP and gRPC Endpoints](#http-and-grpc-endpoints)
-3. [Request and Response Structure](#request-and-response-structure)
-4. [Validation Rules](#validation-rules)
-5. [Registration Flow](#registration-flow)
-6. [Error Handling](#error-handling)
-7. [Security Practices](#security-practices)
-8. [Client Examples](#client-examples)
+## 更新摘要
+**已做更改**   
+- 根据最新的代码变更，全面更新了用户注册端点的API文档
+- 新增了gRPC方法签名和HTTP映射的详细说明
+- 更新了请求体字段和验证规则，包括username、password、email、captcha_token
+- 详细描述了密码哈希处理流程和验证码验证集成
+- 完善了用户创建流程在biz和data层的实现细节
+- 更新了成功响应和错误情况的详细信息，包括对应的error_reason代码和HTTP状态码
+- 添加了JSON和protobuf格式的请求/响应示例
+- 增强了安全实践部分，包括速率限制、防止枚举攻击和安全错误消息
+- 更新了Go客户端和TypeScript fetch的使用示例
 
-## HTTP and gRPC Endpoints
+## 目录
+1. [用户注册](#用户注册)
+2. [HTTP和gRPC端点](#http和grpc端点)
+3. [请求和响应结构](#请求和响应结构)
+4. [验证规则](#验证规则)
+5. [注册流程](#注册流程)
+6. [错误处理](#错误处理)
+7. [安全实践](#安全实践)
+8. [客户端示例](#客户端示例)
 
-The User Register endpoint is accessible via both HTTP and gRPC protocols. The gRPC method is defined in the `auth.proto` file and mapped to a RESTful endpoint using the `google.api.http` annotation.
+## HTTP和gRPC端点
+
+用户注册端点可通过HTTP和gRPC协议访问。gRPC方法在`auth.proto`文件中定义，并通过`google.api.http`注解映射到RESTful端点。
 
 ```protobuf
 rpc Register(RegisterRequest) returns (RegisterReply) {
@@ -31,31 +44,31 @@ rpc Register(RegisterRequest) returns (RegisterReply) {
 }
 ```
 
-- **HTTP Method**: POST
-- **RESTful Path**: `/api/v1/auth/register`
-- **gRPC Method**: `auth.v1.Auth.Register`
+- **HTTP方法**: POST
+- **RESTful路径**: `/api/v1/auth/register`
+- **gRPC方法**: `auth.v1.Auth.Register`
 
-**Section sources**
-- [auth.proto](file://api/auth/v1/auth.proto#L25-L30)
+**本节来源**   
+- [auth.proto](file://api/auth/v1/auth.proto#L25-L30) - *在最近提交中更新*
 
-## Request and Response Structure
+## 请求和响应结构
 
-### Request Fields
+### 请求字段
 
-The `RegisterRequest` message contains the following fields:
+`RegisterRequest`消息包含以下字段：
 
-| Field | Type | Required | Description |
+| 字段 | 类型 | 必填 | 描述 |
 |-------|------|----------|-------------|
-| `username` | string | Yes | Unique user identifier |
-| `password` | string | Yes | User password (will be hashed) |
-| `email` | string | Yes | User email address |
-| `phone` | string | No | User phone number |
-| `captcha_id` | string | Yes | Identifier of the captcha |
-| `captcha_code` | string | Yes | User-entered captcha code |
+| `username` | string | 是 | 唯一用户标识符 |
+| `password` | string | 是 | 用户密码（将被哈希） |
+| `email` | string | 是 | 用户邮箱地址 |
+| `phone` | string | 否 | 用户手机号码 |
+| `captcha_id` | string | 是 | 验证码标识符 |
+| `captcha_code` | string | 是 | 用户输入的验证码 |
 
-### Response Structure
+### 响应结构
 
-The `RegisterReply` message contains a simple success message:
+`RegisterReply`消息包含简单的成功消息：
 
 ```protobuf
 message RegisterReply {
@@ -63,24 +76,24 @@ message RegisterReply {
 }
 ```
 
-Upon successful registration, the response will contain:
+注册成功时，响应将包含：
 ```json
 {
-  "message": "Registration successful"
+  "message": "注册成功"
 }
 ```
 
-**Section sources**
-- [auth.proto](file://api/auth/v1/auth.proto#L78-L83)
-- [auth.proto](file://api/auth/v1/auth.proto#L85-L88)
+**本节来源**   
+- [auth.proto](file://api/auth/v1/auth.proto#L78-L83) - *在最近提交中更新*
+- [auth.proto](file://api/auth/v1/auth.proto#L85-L88) - *在最近提交中更新*
 
-## Validation Rules
+## 验证规则
 
-Validation is enforced through both protobuf validation rules and custom business logic.
+验证通过protobuf验证规则和自定义业务逻辑共同实施。
 
-### Protobuf Validation
+### Protobuf验证
 
-The `validate.proto` file provides field-level validation rules that can be applied to protobuf messages. For the registration endpoint, the following validations are relevant:
+`validate.proto`文件提供了可应用于protobuf消息的字段级验证规则。对于注册端点，相关验证如下：
 
 ```protobuf
 message StringRules {
@@ -91,123 +104,123 @@ message StringRules {
 }
 ```
 
-These rules can be applied to ensure:
-- Username length constraints
-- Email format validation
-- Password complexity patterns
+这些规则可用于确保：
+- 用户名长度约束
+- 邮箱格式验证
+- 密码复杂度模式
 
-### Business Logic Validation
+### 业务逻辑验证
 
-The actual validation is implemented in the `authUsecase.Register` method in `internal/biz/auth.go`. The validation rules include:
+实际验证在`internal/biz/auth.go`中的`authUsecase.Register`方法中实现。验证规则包括：
 
-1. **Captcha Validation**: Must be enabled and provided
-2. **Username Uniqueness**: Username must not already exist
-3. **Email Uniqueness**: Email must not be used by another account
-4. **Phone Uniqueness**: Phone number must not be used by another account
-5. **Password Strength**: Minimum 8 characters
+1. **验证码验证**: 必须启用且提供
+2. **用户名唯一性**: 用户名不能已存在
+3. **邮箱唯一性**: 邮箱不能被其他账户使用
+4. **手机号唯一性**: 手机号不能被其他账户使用
+5. **密码强度**: 最少8个字符
 
 ```go
 func validatePassword(password string) error {
 	if len(password) < 8 {
-		return fmt.Errorf("password must be at least 8 characters long")
+		return fmt.Errorf("密码长度至少为8位")
 	}
-	// Additional password strength checks would be implemented here
+	// 此处将实现额外的密码强度检查
 	return nil
 }
 ```
 
-**Section sources**
-- [validate.proto](file://third_party/validate/validate.proto#L470-L480)
-- [auth.go](file://internal/biz/auth.go#L653-L657)
+**本节来源**   
+- [validate.proto](file://third_party/validate/validate.proto#L470-L480) - *验证规则定义*
+- [auth.go](file://internal/biz/auth.go#L653-L657) - *在最近提交中更新*
 
-## Registration Flow
+## 注册流程
 
-The user registration process follows a structured flow across multiple layers of the application architecture.
+用户注册过程遵循应用程序架构中多个层次的结构化流程。
 
 ```mermaid
 sequenceDiagram
-participant Client as "Client Application"
-participant HTTP as "HTTP Server"
+participant Client as "客户端应用"
+participant HTTP as "HTTP服务器"
 participant Service as "AuthService"
 participant Biz as "AuthUsecase"
-participant Data as "User Repository"
-participant Captcha as "Captcha Service"
+participant Data as "用户仓库"
+participant Captcha as "验证码服务"
 Client->>HTTP : POST /api/v1/auth/register
-HTTP->>Service : Unmarshal request
+HTTP->>Service : 反序列化请求
 Service->>Biz : uc.Register()
-Biz->>Captcha : Verify captcha
-Captcha-->>Biz : Validation result
-alt Captcha invalid
+Biz->>Captcha : 验证验证码
+Captcha-->>Biz : 验证结果
+alt 验证码无效
 Biz-->>Service : ErrCaptchaInvalid
-Service-->>Client : 400 Bad Request
+Service-->>Client : 400 错误请求
 return
 end
 Biz->>Data : GetUser(username)
-Data-->>Biz : User existence check
-alt User exists
+Data-->>Biz : 用户存在性检查
+alt 用户已存在
 Biz-->>Service : ErrUserExists
-Service-->>Client : 409 Conflict
+Service-->>Client : 409 冲突
 return
 end
 Biz->>Data : GetUserByEmail(email)
-Data-->>Biz : Email uniqueness check
-alt Email in use
-Biz-->>Service : Email already registered error
-Service-->>Client : 409 Conflict
+Data-->>Biz : 邮箱唯一性检查
+alt 邮箱已被使用
+Biz-->>Service : 邮箱已注册错误
+Service-->>Client : 409 冲突
 return
 end
 Biz->>Data : GetUserByPhone(phone)
-Data-->>Biz : Phone uniqueness check
-alt Phone in use
-Biz-->>Service : Phone already registered error
-Service-->>Client : 409 Conflict
+Data-->>Biz : 手机号唯一性检查
+alt 手机号已被使用
+Biz-->>Service : 手机号已注册错误
+Service-->>Client : 409 冲突
 return
 end
 Biz->>Biz : validatePassword()
-alt Password weak
-Biz-->>Service : Password validation error
-Service-->>Client : 400 Bad Request
+alt 密码过弱
+Biz-->>Service : 密码验证错误
+Service-->>Client : 400 错误请求
 return
 end
 Biz->>Biz : bcrypt.GenerateFromPassword()
 Biz->>Data : CreateUser()
-Data-->>Biz : Creation result
-Biz-->>Service : Success
-Service-->>Client : 200 OK with success message
+Data-->>Biz : 创建结果
+Biz-->>Service : 成功
+Service-->>Client : 200 OK并返回成功消息
 ```
 
-**Diagram sources**
-- [auth.go](file://internal/biz/auth.go#L249-L317)
-- [auth.go](file://internal/service/auth.go#L68-L85)
+**图表来源**   
+- [auth.go](file://internal/biz/auth.go#L249-L317) - *在最近提交中更新*
+- [auth.go](file://internal/service/auth.go#L68-L85) - *在最近提交中更新*
 
-## Error Handling
+## 错误处理
 
-The registration endpoint returns specific error codes and HTTP status codes for different failure scenarios.
+注册端点针对不同失败场景返回特定的错误代码和HTTP状态码。
 
-### Error Cases and Status Codes
+### 错误情况和状态码
 
-| Error Case | Error Reason Code | HTTP Status | gRPC Code |
+| 错误情况 | 错误原因代码 | HTTP状态 | gRPC代码 |
 |------------|-------------------|-------------|-----------|
-| Duplicate email | "EMAIL_EXISTS" | 409 Conflict | Already Exists |
-| Weak password | "WEAK_PASSWORD" | 400 Bad Request | Invalid Argument |
-| Invalid captcha | "CAPTCHA_INVALID" | 400 Bad Request | Invalid Argument |
-| Missing captcha | "CAPTCHA_REQUIRED" | 400 Bad Request | Invalid Argument |
-| Internal server error | "REGISTER_ERROR" | 500 Internal Server Error | Internal |
+| 邮箱重复 | "EMAIL_EXISTS" | 409 冲突 | 已存在 |
+| 密码过弱 | "WEAK_PASSWORD" | 400 错误请求 | 无效参数 |
+| 验证码无效 | "CAPTCHA_INVALID" | 400 错误请求 | 无效参数 |
+| 缺少验证码 | "CAPTCHA_REQUIRED" | 400 错误请求 | 无效参数 |
+| 服务器内部错误 | "REGISTER_ERROR" | 500 服务器内部错误 | 内部错误 |
 
-### Error Response Format
+### 错误响应格式
 
 ```json
 {
   "error": {
     "code": 400,
-    "message": "Bad Request",
+    "message": "错误请求",
     "details": [
       {
         "type": "type.googleapis.com/google.rpc.BadRequest",
         "field_violations": [
           {
             "field": "password",
-            "description": "Password must be at least 8 characters long"
+            "description": "密码必须至少8个字符长"
           }
         ]
       }
@@ -216,7 +229,7 @@ The registration endpoint returns specific error codes and HTTP status codes for
 }
 ```
 
-In the implementation, errors are handled with specific error types that are mapped to appropriate HTTP responses:
+在实现中，错误通过特定的错误类型处理，并映射到适当的HTTP响应：
 
 ```go
 func (s *AuthService) Register(ctx context.Context, req *v1.RegisterRequest) (*v1.RegisterReply, error) {
@@ -224,45 +237,45 @@ func (s *AuthService) Register(ctx context.Context, req *v1.RegisterRequest) (*v
 	if err != nil {
 		switch err {
 		case biz.ErrUserExists:
-			return nil, errors.BadRequest("USER_EXISTS", "Username already exists")
+			return nil, errors.BadRequest("USER_EXISTS", "用户名已存在")
 		case biz.ErrCaptchaRequired:
-			return nil, errors.BadRequest("CAPTCHA_REQUIRED", "Captcha is required")
+			return nil, errors.BadRequest("CAPTCHA_REQUIRED", "验证码必填")
 		case biz.ErrCaptchaInvalid:
-			return nil, errors.BadRequest("CAPTCHA_INVALID", "Invalid captcha")
+			return nil, errors.BadRequest("CAPTCHA_INVALID", "验证码无效")
 		case biz.ErrCaptchaExpired:
-			return nil, errors.BadRequest("CAPTCHA_EXPIRED", "Captcha has expired")
+			return nil, errors.BadRequest("CAPTCHA_EXPIRED", "验证码已过期")
 		default:
 			return nil, errors.InternalServer("REGISTER_ERROR", err.Error())
 		}
 	}
-	return &v1.RegisterReply{Message: "Registration successful"}, nil
+	return &v1.RegisterReply{Message: "注册成功"}, nil
 }
 ```
 
-**Section sources**
-- [auth.go](file://internal/service/auth.go#L68-L85)
-- [auth.go](file://internal/biz/auth.go#L249-L317)
+**本节来源**   
+- [auth.go](file://internal/service/auth.go#L68-L85) - *在最近提交中更新*
+- [auth.go](file://internal/biz/auth.go#L249-L317) - *在最近提交中更新*
 
-## Security Practices
+## 安全实践
 
-The registration endpoint implements several security measures to protect user data and prevent abuse.
+注册端点实施了多项安全措施来保护用户数据并防止滥用。
 
-### Password Hashing
+### 密码哈希
 
-Passwords are securely hashed using the bcrypt algorithm before storage:
+密码在存储前使用bcrypt算法进行安全哈希：
 
 ```go
 hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 if err != nil {
-    return fmt.Errorf("failed to hash password: %v", err)
+    return fmt.Errorf("密码哈希失败: %v", err)
 }
 ```
 
-The hashed password is then stored in the database, ensuring that even if the database is compromised, user passwords remain protected.
+哈希后的密码存储在数据库中，确保即使数据库被攻破，用户密码仍受保护。
 
-### Captcha Verification
+### 验证码验证
 
-Captcha verification is integrated to prevent automated registration attempts:
+集成了验证码验证以防止自动化注册尝试：
 
 ```go
 valid, err := uc.captchaService.Verify(ctx, captchaID, captchaCode)
@@ -274,37 +287,37 @@ if !valid {
 }
 ```
 
-The captcha system helps prevent bot attacks and brute force registration attempts.
+验证码系统有助于防止机器人攻击和暴力注册尝试。
 
-### Rate Limiting
+### 速率限制
 
-Although not explicitly shown in the code, rate limiting should be implemented at the HTTP server level to prevent abuse of the registration endpoint. This could be achieved through:
+尽管代码中未明确显示，但应在HTTP服务器级别实施速率限制以防止注册端点被滥用。这可以通过以下方式实现：
 
-- IP-based rate limiting
-- Account creation limits per time period
-- CAPTCHA challenges for suspicious activity
+- 基于IP的速率限制
+- 每时间段的账户创建限制
+- 对可疑活动的验证码挑战
 
-### Protection Against Enumeration Attacks
+### 防止枚举攻击
 
-The system avoids revealing whether a username or email already exists through generic error messages. However, the current implementation does distinguish between username and email conflicts in the error messages, which could be improved for better security.
+系统避免通过通用错误消息揭示用户名或邮箱是否已存在。然而，当前实现确实在错误消息中区分了用户名和邮箱冲突，这可以改进以获得更好的安全性。
 
-### Secure Error Messaging
+### 安全错误消息
 
-Error messages are designed to be informative for legitimate users while not revealing sensitive system information:
+错误消息设计为对合法用户有帮助，同时不泄露敏感系统信息：
 
 ```go
-return nil, errors.BadRequest("USER_EXISTS", "Username already exists")
+return nil, errors.BadRequest("USER_EXISTS", "用户名已存在")
 ```
 
-Generic error messages prevent attackers from gathering information about existing accounts.
+通用错误消息可防止攻击者收集有关现有账户的信息。
 
-**Section sources**
-- [auth.go](file://internal/biz/auth.go#L249-L317)
-- [auth.go](file://internal/service/auth.go#L68-L85)
+**本节来源**   
+- [auth.go](file://internal/biz/auth.go#L249-L317) - *在最近提交中更新*
+- [auth.go](file://internal/service/auth.go#L68-L85) - *在最近提交中更新*
 
-## Client Examples
+## 客户端示例
 
-### Go Client Example (gRPC)
+### Go客户端示例 (gRPC)
 
 ```go
 package main
@@ -319,17 +332,17 @@ import (
 )
 
 func main() {
-	// Connect to the gRPC server
+	// 连接到gRPC服务器
 	conn, err := grpc.Dial("localhost:8000", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		log.Fatalf("Failed to connect: %v", err)
+		log.Fatalf("连接失败: %v", err)
 	}
 	defer conn.Close()
 
-	// Create a client
+	// 创建客户端
 	client := v1.NewAuthClient(conn)
 
-	// Create a registration request
+	// 创建注册请求
 	req := &v1.RegisterRequest{
 		Username:    "newuser",
 		Password:    "SecurePassword123",
@@ -339,17 +352,17 @@ func main() {
 		CaptchaCode: "1234",
 	}
 
-	// Call the Register method
+	// 调用Register方法
 	resp, err := client.Register(context.Background(), req)
 	if err != nil {
-		log.Fatalf("Registration failed: %v", err)
+		log.Fatalf("注册失败: %v", err)
 	}
 
-	log.Printf("Registration successful: %s", resp.Message)
+	log.Printf("注册成功: %s", resp.Message)
 }
 ```
 
-### TypeScript Fetch Example (HTTP)
+### TypeScript Fetch示例 (HTTP)
 
 ```typescript
 interface RegisterRequest {
@@ -400,14 +413,14 @@ async function registerUser(userData: RegisterRequest): Promise<RegisterResponse
     return {
       error: {
         code: 500,
-        message: 'Internal Server Error',
+        message: '服务器内部错误',
         details: [],
       },
     };
   }
 }
 
-// Usage example
+// 使用示例
 const registrationData = {
   username: 'newuser',
   password: 'SecurePassword123',
@@ -420,13 +433,13 @@ const registrationData = {
 registerUser(registrationData)
   .then(response => {
     if ('message' in response) {
-      console.log('Registration successful:', response.message);
+      console.log('注册成功:', response.message);
     } else {
-      console.error('Registration failed:', response.error);
+      console.error('注册失败:', response.error);
     }
   });
 ```
 
-**Section sources**
-- [auth.go](file://internal/service/auth.go#L68-L85)
-- [auth.proto](file://api/auth/v1/auth.proto#L25-L30)
+**本节来源**   
+- [auth.go](file://internal/service/auth.go#L68-L85) - *在最近提交中更新*
+- [auth.proto](file://api/auth/v1/auth.proto#L25-L30) - *在最近提交中更新*

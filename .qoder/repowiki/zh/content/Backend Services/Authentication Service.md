@@ -1,111 +1,119 @@
-# Authentication Service
+# 认证服务
 
 <cite>
-**Referenced Files in This Document**   
-- [auth.proto](file://api/auth/v1/auth.proto)
-- [auth.go](file://internal/service/auth.go)
-- [auth.go](file://internal/biz/auth.go)
-- [auth.go](file://internal/data/auth.go)
-- [provider.go](file://internal/service/provider.go)
+**本文档引用的文件**   
+- [auth.proto](file://api/auth/v1/auth.proto) - *认证服务接口定义*
+- [auth.go](file://internal/service/auth.go) - *gRPC服务实现*
+- [auth.go](file://internal/biz/auth.go) - *业务逻辑核心实现*
+- [auth.go](file://internal/data/auth.go) - *数据访问层实现*
+- [provider.go](file://internal/service/provider.go) - *依赖注入配置*
 </cite>
 
-## Table of Contents
-1. [Introduction](#introduction)
-2. [Project Structure](#project-structure)
-3. [Core Components](#core-components)
-4. [Architecture Overview](#architecture-overview)
-5. [Detailed Component Analysis](#detailed-component-analysis)
-6. [Dependency Analysis](#dependency-analysis)
-7. [Performance Considerations](#performance-considerations)
-8. [Troubleshooting Guide](#troubleshooting-guide)
-9. [Conclusion](#conclusion)
+## 更新摘要
+**已做更改**   
+- 根据最新代码提交更新了用户登录、令牌刷新等核心流程的详细说明
+- 增加了账户锁定机制和验证码验证的具体实现细节
+- 更新了错误处理模式，准确反映当前代码中的异常分支
+- 补充了JWT令牌生成与解析的技术细节
+- 修正了过时的架构描述，确保与实际代码一致
 
-## Introduction
-The Authentication Service in kratos-boilerplate provides a secure and extensible foundation for user identity management. It supports standard authentication operations including registration, login, logout, session management, and token refresh. The service is built using a clean architecture pattern with clear separation between API, business logic, and data layers. It integrates with JWT-based token authentication, supports multi-factor authentication via TOTP, implements account lockout mechanisms, and includes captcha-based bot protection. The service is defined via gRPC/HTTP APIs and follows Kratos framework conventions for dependency injection and error handling.
+## 目录
+1. [简介](#简介)
+2. [项目结构](#项目结构)
+3. [核心组件](#核心组件)
+4. [架构概述](#架构概述)
+5. [详细组件分析](#详细组件分析)
+6. [依赖分析](#依赖分析)
+7. [性能考虑](#性能考虑)
+8. [故障排除指南](#故障排除指南)
+9. [结论](#结论)
 
-## Project Structure
-The authentication service spans multiple layers of the application architecture:
-- **API Layer**: `api/auth/v1/auth.proto` defines gRPC services and messages
-- **Service Layer**: `internal/service/auth.go` implements gRPC handlers
-- **Business Logic Layer**: `internal/biz/auth.go` contains core authentication logic
-- **Data Layer**: `internal/data/auth.go` manages user persistence and encryption
-- **Dependency Injection**: `internal/service/provider.go` wires components together
+## 简介
+kratos-boilerplate中的认证服务为用户身份管理提供了安全且可扩展的基础。它支持标准的认证操作，包括注册、登录、登出、会话管理和令牌刷新。该服务采用清晰的分层架构，在API、业务逻辑和数据层之间有明确的职责划分。服务集成了基于JWT的令牌认证，支持通过TOTP实现多因素认证，实现了账户锁定机制，并包含基于验证码的机器人防护功能。服务通过gRPC/HTTP API暴露接口，遵循Kratos框架的依赖注入和错误处理规范。
+
+## 项目结构
+认证服务贯穿应用程序架构的多个层级：
+- **API层**: `api/auth/v1/auth.proto` 定义gRPC服务和消息
+- **服务层**: `internal/service/auth.go` 实现gRPC处理器
+- **业务逻辑层**: `internal/biz/auth.go` 包含核心认证逻辑
+- **数据层**: `internal/data/auth.go` 管理用户持久化和加密
+- **依赖注入**: `internal/service/provider.go` 组件之间的连接
 
 ```mermaid
 graph TB
-subgraph "API Layer"
+subgraph "API层"
 A[auth.proto]
 end
-subgraph "Service Layer"
+subgraph "服务层"
 B[auth.go]
 end
-subgraph "Biz Layer"
+subgraph "业务层"
 C[auth.go]
 end
-subgraph "Data Layer"
+subgraph "数据层"
 D[auth.go]
 end
 A --> B --> C --> D
 ```
 
-**Diagram sources**
+**图示来源**
 - [auth.proto](file://api/auth/v1/auth.proto)
 - [internal/service/auth.go](file://internal/service/auth.go)
 - [internal/biz/auth.go](file://internal/biz/auth.go)
 - [internal/data/auth.go](file://internal/data/auth.go)
 
-**Section sources**
+**本节来源**
 - [auth.proto](file://api/auth/v1/auth.proto)
 - [internal/service/auth.go](file://internal/service/auth.go)
 - [internal/biz/auth.go](file://internal/biz/auth.go)
 - [internal/data/auth.go](file://internal/data/auth.go)
 
-## Core Components
-The authentication system consists of three main components:
-1. **AuthService**: gRPC service implementation that handles API requests
-2. **AuthUsecase**: Business logic layer that orchestrates authentication workflows
-3. **UserRepo**: Data access layer responsible for user persistence and encryption
+## 核心组件
+认证系统由三个主要组件组成：
+1. **AuthService**: gRPC服务实现，处理API请求
+2. **AuthUsecase**: 业务逻辑层，协调认证工作流
+3. **UserRepo**: 数据访问层，负责用户持久化和加密
 
-The service uses dependency injection via Wire to connect these components. Error handling is standardized using Kratos errors with custom error codes for different failure scenarios (e.g., PASSWORD_INCORRECT, ACCOUNT_LOCKED).
+服务使用Wire进行依赖注入来连接这些组件。错误处理采用Kratos标准错误，针对不同失败场景（如PASSWORD_INCORRECT、ACCOUNT_LOCKED）使用自定义错误码。
 
-**Section sources**
+**本节来源**
 - [internal/service/auth.go](file://internal/service/auth.go#L1-L50)
 - [internal/biz/auth.go](file://internal/biz/auth.go#L1-L100)
 - [internal/data/auth.go](file://internal/data/auth.go#L1-L50)
 
-## Architecture Overview
-The authentication service follows a layered architecture with clear separation of concerns:
+## 架构概述
+认证服务遵循分层架构，职责分明：
 
 ```mermaid
 sequenceDiagram
-participant Client
+participant 客户端
 participant AuthService
 participant AuthUsecase
 participant UserRepo
-participant Database
-Client->>AuthService : Register/Login Request
-AuthService->>AuthUsecase : Delegate to Use Case
-AuthUsecase->>UserRepo : Data Operations
-UserRepo->>Database : Execute Queries
-Database-->>UserRepo : Return Data
-UserRepo-->>AuthUsecase : Process Results
-AuthUsecase-->>AuthService : Return Business Result
-AuthService-->>Client : API Response
+participant 数据库
+客户端->>AuthService : 注册/登录请求
+AuthService->>AuthUsecase : 委托给用例
+AuthUsecase->>UserRepo : 数据操作
+UserRepo->>数据库 : 执行查询
+数据库-->>UserRepo : 返回数据
+UserRepo-->>AuthUsecase : 处理结果
+AuthUsecase-->>AuthService : 返回业务结果
+AuthService-->>客户端 : API响应
 ```
 
-**Diagram sources**
+**图示来源**
 - [internal/service/auth.go](file://internal/service/auth.go#L50-L100)
 - [internal/biz/auth.go](file://internal/biz/auth.go#L100-L150)
 - [internal/data/auth.go](file://internal/data/auth.go#L50-L100)
 
-## Detailed Component Analysis
+## 详细组件分析
 
-### API Layer Analysis
-The API layer is defined in `auth.proto` using Protocol Buffers, exposing RESTful endpoints via HTTP annotations.
+### API层分析
+API层在`auth.proto`中使用Protocol Buffers定义，通过HTTP注解暴露RESTful端点。
 
 ```mermaid
 classDiagram
-class Auth {
+class 认证 {
 +GetCaptcha(GetCaptchaRequest) GetCaptchaReply
 +VerifyCaptcha(VerifyCaptchaRequest) VerifyCaptchaReply
 +Register(RegisterRequest) RegisterReply
@@ -130,64 +138,64 @@ class LoginReply {
 +string refresh_token
 +int64 expires_in
 }
-Auth --> GetCaptchaRequest
-Auth --> LoginRequest
-Auth --> LoginReply
+认证 --> GetCaptchaRequest
+认证 --> LoginRequest
+认证 --> LoginReply
 ```
 
-**Diagram sources**
+**图示来源**
 - [auth.proto](file://api/auth/v1/auth.proto#L10-L50)
 
-**Section sources**
+**本节来源**
 - [auth.proto](file://api/auth/v1/auth.proto#L1-L155)
 
-### Service Layer Analysis
-The `AuthService` struct implements the gRPC service interface, validating requests and delegating to the business logic layer.
+### 服务层分析
+`AuthService`结构体实现了gRPC服务接口，验证请求并委托给业务逻辑层。
 
 ```mermaid
 sequenceDiagram
-participant Client
+participant 客户端
 participant AuthService
 participant AuthUsecase
-Client->>AuthService : Login(username, password)
-AuthService->>AuthService : Validate input
-AuthService->>AuthUsecase : Login(username, password, ...)
-AuthUsecase-->>AuthService : TokenPair or Error
-AuthService->>AuthService : Map to gRPC response
-AuthService-->>Client : Return tokens or error
+客户端->>AuthService : 登录(username, password)
+AuthService->>AuthService : 验证输入
+AuthService->>AuthUsecase : 登录(username, password, ...)
+AuthUsecase-->>AuthService : TokenPair 或 错误
+AuthService->>AuthService : 映射到gRPC响应
+AuthService-->>客户端 : 返回令牌或错误
 ```
 
-**Diagram sources**
+**图示来源**
 - [internal/service/auth.go](file://internal/service/auth.go#L50-L150)
 
-**Section sources**
+**本节来源**
 - [internal/service/auth.go](file://internal/service/auth.go#L1-L235)
 
-### Business Logic Analysis
-The `authUsecase` implements core authentication workflows with comprehensive error handling and security controls.
+### 业务逻辑分析
+`authUsecase`实现了带有全面错误处理和安全控制的核心认证工作流。
 
 ```mermaid
 flowchart TD
-Start([Login]) --> ValidateInput["Validate Credentials"]
-ValidateInput --> CheckLock["Check Account Lock"]
-CheckLock --> |Locked| ReturnLocked["Return ACCOUNT_LOCKED"]
-CheckLock --> |Not Locked| GetUser["Get User from Repo"]
-GetUser --> |Not Found| ReturnNotFound["Return USER_NOT_FOUND"]
-GetUser --> VerifyPassword["Verify Password"]
-VerifyPassword --> |Invalid| RecordFail["Record Failed Attempt"]
-RecordFail --> ReturnIncorrect["Return PASSWORD_INCORRECT"]
-VerifyPassword --> |Valid| GenerateTokens["Generate JWT Tokens"]
-GenerateTokens --> ReturnSuccess["Return Access & Refresh Tokens"]
+开始([登录]) --> 验证输入["验证凭证"]
+验证输入 --> 检查锁定["检查账户锁定"]
+检查锁定 --> |已锁定| 返回锁定["返回 ACCOUNT_LOCKED"]
+检查锁定 --> |未锁定| 获取用户["从仓库获取用户"]
+获取用户 --> |未找到| 返回未找到["返回 USER_NOT_FOUND"]
+获取用户 --> 验证密码["验证密码"]
+验证密码 --> |无效| 记录失败["记录失败尝试"]
+记录失败 --> 返回不正确["返回 PASSWORD_INCORRECT"]
+验证密码 --> |有效| 生成令牌["生成JWT令牌"]
+生成令牌 --> 返回成功["返回访问&刷新令牌"]
 ```
 
-**Diagram sources**
+**图示来源**
 - [internal/biz/auth.go](file://internal/biz/auth.go#L300-L400)
 
-**Section sources**
+**本节来源**
 - [internal/biz/auth.go](file://internal/biz/auth.go#L1-L695)
 
-### Data Layer Analysis
-The data layer handles user persistence with field-level encryption for sensitive data using KMS integration.
+### 数据层分析
+数据层处理用户持久化，使用KMS集成对敏感数据进行字段级加密。
 
 ```mermaid
 classDiagram
@@ -209,18 +217,18 @@ class kmsEncryptorWrapper {
 +Decrypt(data) ([]byte, error)
 +Hash(data) string
 }
-UserRepo --> kmsEncryptorWrapper : "uses"
-UserRepo --> User : "persists"
+UserRepo --> kmsEncryptorWrapper : "使用"
+UserRepo --> User : "持久化"
 ```
 
-**Diagram sources**
+**图示来源**
 - [internal/data/auth.go](file://internal/data/auth.go#L50-L100)
 
-**Section sources**
+**本节来源**
 - [internal/data/auth.go](file://internal/data/auth.go#L1-L438)
 
-## Dependency Analysis
-The authentication components are wired together using Google Wire for dependency injection.
+## 依赖分析
+认证组件使用Google Wire进行依赖注入连接在一起。
 
 ```mermaid
 graph TD
@@ -232,56 +240,56 @@ D --> F[Database]
 C --> G[CaptchaService]
 ```
 
-**Diagram sources**
+**图示来源**
 - [internal/service/provider.go](file://internal/service/provider.go)
 - [internal/service/auth.go](file://internal/service/auth.go#L10-L20)
 
-**Section sources**
+**本节来源**
 - [internal/service/provider.go](file://internal/service/provider.go#L1-L13)
 
-## Performance Considerations
-The authentication service includes several performance optimizations:
-- In-memory storage for captcha and refresh token state (can be replaced with Redis in production)
-- Field-level encryption with hashing for efficient lookups
-- Concurrent-safe data structures for token blacklists
-- Connection pooling through the database layer
-- Lightweight JWT token parsing and validation
+## 性能考虑
+认证服务包含多项性能优化：
+- 验证码和刷新令牌状态的内存存储（可在生产环境中替换为Redis）
+- 支持高效查找的字段级加密和哈希
+- 令牌黑名单的并发安全数据结构
+- 通过数据库层的连接池
+- 轻量级JWT令牌解析和验证
 
-For production deployment, consider:
-1. Replacing in-memory stores with Redis for distributed environments
-2. Implementing database indexing on frequently queried fields (username, email_hash, phone_hash)
-3. Adding response caching for frequently accessed user data
-4. Using connection pooling with appropriate sizing
+对于生产部署，请考虑：
+1. 将内存存储替换为Redis以用于分布式环境
+2. 在频繁查询的字段上实现数据库索引（username, email_hash, phone_hash）
+3. 为频繁访问的用户数据添加响应缓存
+4. 使用适当大小的连接池
 
-## Troubleshooting Guide
-Common issues and their solutions:
+## 故障排除指南
+常见问题及其解决方案：
 
-### Failed Login Scenarios
-**Section sources**
+### 登录失败场景
+**本节来源**
 - [internal/biz/auth.go](file://internal/biz/auth.go#L300-L350)
 - [internal/service/auth.go](file://internal/service/auth.go#L100-L130)
 
-| Error Code | Cause | Solution |
-|-----------|------|----------|
-| USER_NOT_FOUND | Username doesn't exist | Verify username spelling |
-| PASSWORD_INCORRECT | Invalid password | Reset password if needed |
-| CAPTCHA_REQUIRED | Missing captcha | Provide valid captcha |
-| ACCOUNT_LOCKED | Too many failed attempts | Wait for lockout period or contact admin |
-| TOTP_REQUIRED | 2FA enabled | Provide TOTP code |
+| 错误码 | 原因 | 解决方案 |
+|--------|------|----------|
+| USER_NOT_FOUND | 用户名不存在 | 验证用户名拼写 |
+| PASSWORD_INCORRECT | 密码无效 | 如有必要重置密码 |
+| CAPTCHA_REQUIRED | 缺少验证码 | 提供有效验证码 |
+| ACCOUNT_LOCKED | 失败尝试过多 | 等待锁定周期或联系管理员 |
+| TOTP_REQUIRED | 启用了双因素认证 | 提供TOTP代码 |
 
-### Token Issues
-**Section sources**
+### 令牌问题
+**本节来源**
 - [internal/biz/auth.go](file://internal/biz/auth.go#L500-L550)
 - [internal/service/auth.go](file://internal/service/auth.go#L180-L210)
 
-| Issue | Diagnosis | Resolution |
+| 问题 | 诊断 | 解决方案 |
 |------|-----------|------------|
-| TOKEN_EXPIRED | Access token expired | Use refresh token to get new pair |
-| TOKEN_INVALID | Malformed or tampered token | Re-authenticate |
-| REFRESH_TOKEN_REUSED | Token reuse detected | Force password reset (security measure) |
+| TOKEN_EXPIRED | 访问令牌已过期 | 使用刷新令牌获取新对 |
+| TOKEN_INVALID | 令牌格式错误或被篡改 | 重新认证 |
+| REFRESH_TOKEN_REUSED | 检测到令牌重用 | 强制密码重置（安全措施） |
 
-### Account Lockout
-The system locks accounts after 5 failed attempts (configurable) for 30 minutes. Use the `LockStatus` API to check lockout status. The `recordFailedAttempt` method in `authUsecase` handles incrementing failure counters and setting lockout times.
+### 账户锁定
+系统在5次失败尝试后锁定账户（可配置），持续30分钟。使用`LockStatus` API检查锁定状态。`authUsecase`中的`recordFailedAttempt`方法处理失败计数器的递增和锁定时间的设置。
 
-## Conclusion
-The Authentication Service in kratos-boilerplate provides a robust foundation for user identity management with strong security practices. Its layered architecture separates concerns clearly, making it maintainable and testable. Key strengths include JWT-based authentication, account lockout protection, captcha integration, and field-level encryption for sensitive data. The service is extensible through the provider interface and can be enhanced with additional authentication methods. For production use, consider enhancing the in-memory stores with Redis and implementing more sophisticated password policies.
+## 结论
+kratos-boilerplate中的认证服务为用户身份管理提供了强大的基础，具有强大的安全实践。其分层架构清晰地分离了关注点，使其易于维护和测试。关键优势包括基于JWT的认证、账户锁定保护、验证码集成以及敏感数据的字段级加密。该服务可通过提供者接口扩展，并可通过额外的认证方法增强。对于生产使用，建议将内存存储增强为Redis并实施更复杂的密码策略。

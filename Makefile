@@ -43,6 +43,9 @@ api:
  	       --go-grpc_out=paths=source_relative:./api \
 	       --openapi_out=fq_schema_naming=true,default_response=false:. \
 	       $(API_PROTO_FILES)
+	@echo "API proto files generated successfully"
+	@echo "OpenAPI documentation generated in current directory"
+	@ls -la *.yaml 2>/dev/null | grep -E "(openapi|swagger)" || echo "Checking for generated OpenAPI files..."
 
 .PHONY: build
 # build

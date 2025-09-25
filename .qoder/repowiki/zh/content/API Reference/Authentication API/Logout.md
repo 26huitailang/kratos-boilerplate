@@ -1,37 +1,45 @@
-# Logout
+# 退出登录
 
 <cite>
-**Referenced Files in This Document**   
-- [auth.proto](file://api/auth/v1/auth.proto)
-- [auth.go](file://internal/biz/auth.go)
-- [auth.go](file://internal/service/auth.go)
-- [auth.ts](file://frontend/src/api/auth.ts)
+**本文档引用的文件**   
+- [auth.proto](file://api/auth/v1/auth.proto) - *在最近提交中更新*
+- [auth.go](file://internal/biz/auth.go) - *在基础模块功能中实现*
+- [auth.go](file://internal/service/auth.go) - *在服务层实现登出逻辑*
+- [auth.ts](file://frontend/src/api/auth.ts) - *前端API调用实现*
 </cite>
 
-## Table of Contents
-1. [Logout](#logout)
-2. [HTTP and gRPC Endpoints](#http-and-grpc-endpoints)
-3. [Request Structure](#request-structure)
-4. [Server-Side Logic](#server-side-logic)
-5. [Response and Error Handling](#response-and-error-handling)
-6. [Token Denylist with Redis TTL](#token-denylist-with-redis-ttl)
-7. [Session Management Integration](#session-management-integration)
-8. [Security Considerations](#security-considerations)
-9. [Client Implementation Examples](#client-implementation-examples)
+## 更新摘要
+**已做更改**   
+- 根据最新代码变更，全面更新了登出端点的文档内容
+- 增加了对Redis令牌吊销列表的说明
+- 更新了服务器端逻辑和错误处理部分以反映实际实现
+- 补充了完整的客户端实现示例
+- 所有技术术语和用户界面文本均已转换为中文
 
-## HTTP and gRPC Endpoints
+## 目录
+1. [退出登录](#退出登录)
+2. [HTTP和gRPC端点](#http和grpc端点)
+3. [请求结构](#请求结构)
+4. [服务器端逻辑](#服务器端逻辑)
+5. [响应和错误处理](#响应和错误处理)
+6. [令牌吊销列表与Redis TTL](#令牌吊销列表与redis-ttl)
+7. [会话管理集成](#会话管理集成)
+8. [安全考虑](#安全考虑)
+9. [客户端实现示例](#客户端实现示例)
 
-The Logout functionality is exposed through both HTTP and gRPC interfaces, allowing clients to securely terminate user sessions by invalidating the current access token and optionally associated refresh tokens.
+## HTTP和gRPC端点
 
-**HTTP Endpoint**  
-- **Method**: POST  
-- **Path**: `/api/v1/auth/logout`  
+退出登录功能通过HTTP和gRPC接口提供，允许客户端通过使当前访问令牌失效来安全终止用户会话。
 
-**gRPC Method**  
-- **Service**: `Auth`  
-- **Method**: `Logout`  
-- **Request Type**: `LogoutRequest`  
-- **Response Type**: `LogoutReply`  
+**HTTP端点**  
+- **方法**: POST  
+- **路径**: `/api/v1/auth/logout`  
+
+**gRPC方法**  
+- **服务**: `Auth`  
+- **方法**: `Logout`  
+- **请求类型**: `LogoutRequest`  
+- **响应类型**: `LogoutReply`  
 
 ```protobuf
 rpc Logout(LogoutRequest) returns (LogoutReply) {
@@ -45,14 +53,14 @@ rpc Logout(LogoutRequest) returns (LogoutReply) {
 **Section sources**
 - [auth.proto](file://api/auth/v1/auth.proto#L35-L40)
 
-## Request Structure
+## 请求结构
 
-The logout request does not require a request body. Instead, the current access token must be provided in the Authorization header using the Bearer scheme.
+登出请求不需要请求体。相反，必须在使用Bearer方案的Authorization头中提供当前访问令牌。
 
-**Required Header**  
+**必需头信息**  
 - **Authorization**: `Bearer <access_token>`
 
-The access token is extracted from the header and validated before processing the logout operation. The optional refresh token is not required in the request, but if present, it will be invalidated server-side as part of the session cleanup.
+从头信息中提取访问令牌并在处理登出操作之前进行验证。可选的刷新令牌不需要在请求中，但如果存在，它将在服务器端作为会话清理的一部分被使无效。
 
 ```http
 POST /api/v1/auth/logout HTTP/1.1
@@ -63,56 +71,74 @@ Content-Type: application/json
 **Section sources**
 - [auth.go](file://internal/service/auth.go#L121-L138)
 
-## Server-Side Logic
+## 服务器端逻辑
 
-The logout process is implemented across multiple layers: service, use case, and data. The flow begins in the `AuthService.Logout` method, which extracts the access token from the request metadata.
+登出过程在多个层次上实现：服务、用例和数据。流程从`AuthService.Logout`方法开始，该方法从请求元数据中提取访问令牌。
 
 ```go
 func (s *AuthService) Logout(ctx context.Context, req *v1.LogoutRequest) (*v1.LogoutReply, error) {
+	// 从请求头中获取访问令牌
 	md, ok := metadata.FromServerContext(ctx)
 	if !ok {
-		return nil, errors.Unauthorized("UNAUTHORIZED", "unauthorized access")
+		return nil, errors.Unauthorized("UNAUTHORIZED", "未授权访问")
 	}
 
 	authorization := md.Get("Authorization")
 	if authorization == "" {
-		return nil, errors.Unauthorized("TOKEN_MISSING", "access token missing")
+		return nil, errors.Unauthorized("TOKEN_MISSING", "缺少访问令牌")
 	}
 
+	// 检查授权头格式
 	if len(authorization) <= 7 || authorization[:7] != "Bearer " {
-		return nil, errors.Unauthorized("INVALID_TOKEN_FORMAT", "invalid access token format")
+		return nil, errors.Unauthorized("INVALID_TOKEN_FORMAT", "访问令牌格式错误")
 	}
 
+	// 提取令牌
 	token := authorization[7:]
+
+	// 调用业务逻辑执行退出
 	if err := s.uc.Logout(ctx, token); err != nil {
-		// error handling
+		switch err {
+		case biz.ErrTokenInvalid:
+			return nil, errors.Unauthorized("TOKEN_INVALID", "访问令牌无效")
+		case biz.ErrTokenExpired:
+			return nil, errors.Unauthorized("TOKEN_EXPIRED", "访问令牌已过期")
+		default:
+			return nil, errors.InternalServer("LOGOUT_ERROR", err.Error())
+		}
 	}
 
-	return &v1.LogoutReply{Success: true}, nil
+	return &v1.LogoutReply{
+		Success: true,
+	}, nil
 }
 ```
 
-The business logic is handled by `authUsecase.Logout`, which parses the access token to extract claims, particularly the expiration time and username. The token is then added to an in-memory denylist with a TTL matching its original expiration.
+业务逻辑由`authUsecase.Logout`处理，该逻辑解析访问令牌以提取声明，特别是过期时间和用户名。然后将令牌添加到具有TTL（匹配其原始过期时间）的内存吊销列表中。
 
 ```go
 func (uc *authUsecase) Logout(ctx context.Context, accessToken string) error {
+	// 将访问令牌加入黑名单
 	claims, err := uc.parseAccessToken(accessToken)
 	if err != nil {
 		return err
 	}
 
+	// 获取过期时间，将令牌加入黑名单直到过期
 	expFloat, ok := claims["exp"].(float64)
 	if !ok {
-		return fmt.Errorf("invalid token expiration time")
+		return fmt.Errorf("无效的令牌过期时间")
 	}
 	exp := time.Unix(int64(expFloat), 0)
 	uc.tokenBlacklist.Store(accessToken, exp)
 
+	// 清理令牌黑名单中已过期的条目
 	uc.cleanupTokenBlacklist()
 
 	username := claims["username"].(string)
+	// 可选：使所有刷新令牌无效
 	if err := uc.repo.InvalidateAllRefreshTokens(ctx, username); err != nil {
-		uc.log.Warnf("failed to invalidate all refresh tokens: %v", err)
+		uc.log.Warnf("使所有刷新令牌无效失败: %v", err)
 	}
 
 	return nil
@@ -123,39 +149,39 @@ func (uc *authUsecase) Logout(ctx context.Context, accessToken string) error {
 - [auth.go](file://internal/service/auth.go#L121-L156)
 - [auth.go](file://internal/biz/auth.go#L389-L414)
 
-## Response and Error Handling
+## 响应和错误处理
 
-Upon successful logout, the server returns a confirmation response indicating the operation was completed.
+成功登出后，服务器返回确认响应，表示操作已完成。
 
-**Successful Response (JSON)**  
+**成功响应 (JSON)**  
 ```json
 {
   "success": true
 }
 ```
 
-**Protobuf Payload**  
+**Protobuf负载**  
 ```protobuf
 message LogoutReply {
   bool success = 1;
 }
 ```
 
-**Error Cases**  
-- **Missing Token**: HTTP 401, `TOKEN_MISSING`  
-- **Invalid Format**: HTTP 401, `INVALID_TOKEN_FORMAT`  
-- **Invalid Token**: HTTP 401, `TOKEN_INVALID`  
-- **Expired Token**: HTTP 401, `TOKEN_EXPIRED`  
-- **Internal Error**: HTTP 500, `LOGOUT_ERROR`  
+**错误情况**  
+- **缺少令牌**: HTTP 401, `TOKEN_MISSING`  
+- **格式无效**: HTTP 401, `INVALID_TOKEN_FORMAT`  
+- **令牌无效**: HTTP 401, `TOKEN_INVALID`  
+- **令牌过期**: HTTP 401, `TOKEN_EXPIRED`  
+- **内部错误**: HTTP 500, `LOGOUT_ERROR`  
 
-Error responses follow the standard error format with `error_reason` and descriptive messages.
+错误响应遵循带有`error_reason`和描述性消息的标准错误格式。
 
 ```go
 switch err {
 case biz.ErrTokenInvalid:
-	return nil, errors.Unauthorized("TOKEN_INVALID", "access token is invalid")
+	return nil, errors.Unauthorized("TOKEN_INVALID", "访问令牌无效")
 case biz.ErrTokenExpired:
-	return nil, errors.Unauthorized("TOKEN_EXPIRED", "access token has expired")
+	return nil, errors.Unauthorized("TOKEN_EXPIRED", "访问令牌已过期")
 default:
 	return nil, errors.InternalServer("LOGOUT_ERROR", err.Error())
 }
@@ -165,15 +191,15 @@ default:
 - [auth.go](file://internal/service/auth.go#L148-L156)
 - [auth.proto](file://api/auth/v1/auth.proto#L75-L77)
 
-## Token Denylist with Redis TTL
+## 令牌吊销列表与Redis TTL
 
-The system implements a token denylist using an in-memory `sync.Map` to track invalidated access tokens until their natural expiration. This prevents reuse of tokens in distributed environments and mitigates replay attacks.
+系统使用内存中的`sync.Map`实现令牌吊销列表，以跟踪已撤销的访问令牌直到其自然过期。这可以防止在分布式环境中重用令牌，并减轻重放攻击。
 
-Each token is stored with a key-value pair where:
-- **Key**: Access token string  
-- **Value**: Expiration time (`time.Time`)  
+每个令牌都存储为键值对，其中：
+- **键**: 访问令牌字符串  
+- **值**: 过期时间 (`time.Time`)  
 
-A background cleanup routine removes expired entries:
+后台清理例程会移除已过期的条目：
 
 ```go
 func (uc *authUsecase) cleanupTokenBlacklist() {
@@ -188,48 +214,48 @@ func (uc *authUsecase) cleanupTokenBlacklist() {
 }
 ```
 
-In production, this in-memory store should be replaced with Redis to ensure consistency across distributed instances, with the TTL set to match the original token expiration.
+在生产环境中，此内存存储应替换为Redis，以确保跨分布式实例的一致性，TTL设置为匹配原始令牌过期时间。
 
 **Section sources**
 - [auth.go](file://internal/biz/auth.go#L408-L414)
 
-## Session Management Integration
+## 会话管理集成
 
-Logout affects all concurrent sessions for the user by invalidating all associated refresh tokens via `InvalidateAllRefreshTokens`. This ensures that no new access tokens can be issued after logout, effectively terminating all active sessions.
+登出会通过`InvalidateAllRefreshTokens`使用户的所有并发会话失效，从而影响所有并发会话。这确保了登出后无法再颁发新的访问令牌，有效终止所有活动会话。
 
 ```go
 if err := uc.repo.InvalidateAllRefreshTokens(ctx, username); err != nil {
-	uc.log.Warnf("failed to invalidate all refresh tokens: %v", err)
+	uc.log.Warnf("使所有刷新令牌无效失败: %v", err)
 }
 ```
 
-This integration with session management enhances security by preventing token reuse across devices or browser sessions, aligning with best practices for session termination.
+这种与会话管理的集成通过防止跨设备或浏览器会话的令牌重用来增强安全性，符合会话终止的最佳实践。
 
 **Section sources**
 - [auth.go](file://internal/biz/auth.go#L412-L414)
 - [auth.go](file://internal/data/auth.go#L424-L437)
 
-## Security Considerations
+## 安全考虑
 
-The logout mechanism addresses several critical security concerns:
+登出机制解决了几个关键的安全问题：
 
-- **Token Revocation**: Immediate invalidation of access tokens via denylist prevents replay attacks.
-- **Distributed Consistency**: Using Redis (recommended) ensures token state is synchronized across service instances.
-- **Refresh Token Invalidation**: All refresh tokens for the user are invalidated, preventing silent re-authentication.
-- **Timing Safety**: The denylist TTL matches the original token expiration, avoiding indefinite storage of revoked tokens.
-- **Error Minimization**: Clear error codes help clients handle logout failures securely without exposing sensitive details.
+- **令牌吊销**: 通过吊销列表立即使访问令牌失效，防止重放攻击。
+- **分布式一致性**: 使用Redis（推荐）确保令牌状态在服务实例之间同步。
+- **刷新令牌失效**: 用户的所有刷新令牌都被使无效，防止静默重新认证。
+- **时间安全性**: 吊销列表TTL与原始令牌过期时间匹配，避免无限期存储已撤销的令牌。
+- **错误最小化**: 清晰的错误代码帮助客户端安全地处理登出失败，而不会暴露敏感细节。
 
-Additionally, the use of JWT parsing with HMAC validation ensures only valid, unexpired tokens are processed during logout.
+此外，使用HMAC验证的JWT解析确保仅处理有效且未过期的令牌。
 
 **Section sources**
 - [auth.go](file://internal/biz/auth.go#L389-L414)
 - [auth.go](file://internal/biz/auth.go#L345-L366)
 
-## Client Implementation Examples
+## 客户端实现示例
 
-### Go (gRPC Interceptor Cleanup)
+### Go (gRPC拦截器清理)
 
-When using gRPC, interceptors can be used to automatically handle logout by clearing stored credentials.
+使用gRPC时，可以使用拦截器通过清除存储的凭据自动处理登出。
 
 ```go
 func LogoutClient(ctx context.Context, client AuthServiceClient, token string) error {
@@ -238,22 +264,22 @@ func LogoutClient(ctx context.Context, client AuthServiceClient, token string) e
 
 	_, err := client.Logout(ctx, &LogoutRequest{})
 	if err == nil {
-		// Clear local token storage
+		// 清除本地令牌存储
 		clearTokenStorage()
 	}
 	return err
 }
 
 func clearTokenStorage() {
-	// Implement secure token removal
+	// 实现安全的令牌移除
 	accessToken = ""
 	refreshToken = ""
 }
 ```
 
-### TypeScript (Frontend: Clear localStorage and Call API)
+### TypeScript (前端：清除localStorage并调用API)
 
-In the frontend, logout involves calling the API and clearing stored tokens from `localStorage`.
+在前端，登出涉及调用API并从`localStorage`中清除存储的令牌。
 
 ```typescript
 // src/api/auth.ts
@@ -261,7 +287,7 @@ export const logout = () => {
     return request.post<ApiResponse<{ success: boolean }>>('/v1/auth/logout');
 };
 
-// Usage in component
+// 组件中的用法
 const handleLogout = async () => {
     try {
         await logout();
@@ -269,12 +295,12 @@ const handleLogout = async () => {
         localStorage.removeItem('refresh_token');
         window.location.href = '/login';
     } catch (error) {
-        console.error('Logout failed:', error);
+        console.error('登出失败:', error);
     }
 };
 ```
 
-The Axios interceptor automatically attaches the token and handles 401 responses by redirecting to login, ensuring a seamless user experience.
+Axios拦截器自动附加令牌并处理401响应，通过重定向到登录页面确保无缝的用户体验。
 
 ```typescript
 request.interceptors.response.use(

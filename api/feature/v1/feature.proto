@@ -8,8 +8,23 @@ import "google/protobuf/timestamp.proto";
 option go_package = "kratos-boilerplate/api/feature/v1;v1";
 
 // 功能开关管理服务
+// @description 提供功能开关的全生命周期管理，包括创建、查询、更新、删除和策略评估
+// @version 1.0
+// @contact.name API Support
+// @contact.email api-support@example.com
 service FeatureToggle {
   // 获取所有功能开关
+  // @description 分页获取功能开关列表，支持按标签过滤和启用状态过滤
+  // @summary 获取功能开关列表
+  // @tags FeatureToggle
+  // @produce application/json
+  // @param page query int false "页码，从1开始" default(1)
+  // @param page_size query int false "每页数量，最大3000" default(20)
+  // @param tags query []string false "按标签过滤"
+  // @param enabled_only query bool false "仅显示启用的开关"
+  // @success 200 {object} ListTogglesReply "成功返回功能开关列表"
+  // @failure 400 {object} ErrorResponse "请求参数错误"
+  // @failure 500 {object} ErrorResponse "内部服务器错误"
   rpc ListToggles(ListTogglesRequest) returns (ListTogglesReply) {
     option (google.api.http) = {
       get: "/api/v1/features"
@@ -17,6 +32,14 @@ service FeatureToggle {
   }
   
   // 获取单个功能开关
+  // @description 根据功能标识获取具体的功能开关配置信息
+  // @summary 获取功能开关详情
+  // @tags FeatureToggle
+  // @produce application/json
+  // @param flag path string true "功能标识符" example("user_management")
+  // @success 200 {object} GetToggleReply "成功返回功能开关信息"
+  // @failure 404 {object} ErrorResponse "功能开关不存在"
+  // @failure 500 {object} ErrorResponse "内部服务器错误"
   rpc GetToggle(GetToggleRequest) returns (GetToggleReply) {
     option (google.api.http) = {
       get: "/api/v1/features/{flag}"
@@ -70,12 +93,22 @@ service FeatureToggle {
   }
 }
 
-// 功能开关策略
+// 功能开关策略类型
+// @description 定义不同的功能开关策略，用于控制功能的启用逻辑
 enum FeatureStrategy {
+  // 简单策略 - 仅根据enabled字段决定是否启用
   SIMPLE = 0;
+  
+  // 百分比策略 - 根据设定的百分比随机启用功能
   PERCENTAGE = 1;
+  
+  // 用户策略 - 根据用户类型或ID决定是否启用
   USER = 2;
+  
+  // 时间策略 - 根据时间范围决定是否启用
   TIME = 3;
+  
+  // 环境策略 - 根据部署环境决定是否启用
   ENVIRONMENT = 4;
 }
 
@@ -107,10 +140,30 @@ message FeatureToggleInfo {
 
 // 请求和响应消息
 
+// 获取功能开关列表请求
+// @description 分页查询功能开关列表的请求参数
 message ListTogglesRequest {
+  // 页码，从1开始
+  // @example 1
+  // @minimum 1
+  // @default 1
   int32 page = 1;
+  
+  // 每页数量，最大1000
+  // @example 20
+  // @minimum 1
+  // @maximum 1000
+  // @default 20
   int32 page_size = 2;
+  
+  // 按标签过滤，可以指定多个标签
+  // 支持的标签包括：auth, api, user, system等
+  // @example ["auth", "api"]
   repeated string tags = 3;
+  
+  // 仅显示启用的开关，为true时仅返回enabled=true的开关
+  // @example false
+  // @default false
   optional bool enabled_only = 4;
 }
 
@@ -162,13 +215,34 @@ message DeleteToggleReply {
   bool success = 1;
 }
 
+// 评估功能开关请求
+// @description 根据上下文信息评估功能开关是否应该启用
 message EvaluateToggleRequest {
+  // 功能标识符
+  // @example "user_management"
+  // @required
   string flag = 1;
+  
+  // 评估上下文，包含用户信息、环境信息等
+  // @required
   EvaluationContext context = 2;
 }
 
+// 评估功能开关响应
+// @description 功能开关评估结果，包含是否启用和原因说明
 message EvaluateToggleReply {
+  // 是否启用该功能
+  // @example true
   bool enabled = 1;
+  
+  // 评估原因说明，解释为什么返回这个结果
+  // 可能的值包括：
+  // - "feature_disabled": 功能全局禁用
+  // - "user_not_allowed": 用户不在允许列表中
+  // - "environment_mismatch": 环境不匹配
+  // - "percentage_not_hit": 百分比未命中
+  // - "simple_enabled": 简单策略启用
+  // @example "simple_enabled"
   string reason = 2;
 }
 

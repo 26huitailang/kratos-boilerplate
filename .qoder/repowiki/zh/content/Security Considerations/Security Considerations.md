@@ -1,7 +1,12 @@
+<docs>
 # 安全考虑
 
 <cite>
 **本文档引用的文件**   
+- [auth.go](file://internal/pkg/auth/auth.go) - *在提交 8027e94 中新增*
+- [middleware.go](file://internal/pkg/auth/middleware.go) - *在提交 8027e94 中新增*
+- [strategies.go](file://internal/pkg/auth/strategies.go) - *在提交 8027e94 中新增*
+- [example.go](file://internal/pkg/auth/example.go) - *在提交 8027e94 中新增*
 - [aes.go](file://internal/pkg/crypto/aes.go#L1-L150)
 - [sm3.go](file://internal/pkg/crypto/sm3.go#L1-L73)
 - [middleware.go](file://internal/pkg/sensitive/middleware.go#L1-L327)
@@ -21,9 +26,9 @@
 
 ## 更新摘要
 **已做更改**   
-- 新增了关于分层功能开关系统的详细章节，涵盖权限点、审计日志等安全相关组件
-- 更新了配置和秘密管理部分，以反映新的功能开关系统配置
-- 在威胁模型部分增加了对功能开关滥用的防护说明
+- 新增了关于企业级认证鉴权模块的详细章节，涵盖认证流程、令牌管理、权限检查等核心安全组件
+- 更新了认证安全部分，以反映新的 `auth` 包实现和中间件设计
+- 在威胁模型部分增加了对新认证机制的安全防护说明
 - 所有受影响的章节都更新了源文件引用，以包含新的和修改过的文件
 
 ## 目录
@@ -85,6 +90,117 @@ end
 **本节来源**
 - [auth.go](file://internal/service/auth.go#L1-L500)
 - [auth.proto](file://api/auth/v1/auth.proto#L1-L100)
+- [auth.go](file://internal/pkg/auth/auth.go#L1-L300)
+- [strategies.go](file://internal/pkg/auth/strategies.go#L1-L86)
+- [middleware.go](file://internal/pkg/auth/middleware.go#L1-L110)
+
+### 企业级认证鉴权模块
+
+kratos-boilerplate 引入了全新的企业级认证鉴权模块，位于 `internal/pkg/auth` 包中，提供了一套完整的认证、授权和令牌管理解决方案。该模块采用清晰的接口设计和可扩展的架构，支持多种认证策略和灵活的权限控制。
+
+核心组件包括：
+- **AuthManager**: 认证管理器，负责注册和调用不同的认证策略
+- **TokenManager**: 令牌管理器，处理 JWT 令牌的生成、验证和刷新
+- **AuthStrategy**: 认证策略接口，支持密码认证、API 密钥等多种方式
+- **Subject**: 认证主体，包含用户身份、属性、权限和角色信息
+
+认证流程通过 `DefaultAuthManager` 实现，首先通过 `RegisterStrategy` 方法注册具体的认证策略（如 `PasswordAuthStrategy`），然后在认证时根据策略名称调用相应的 `Authenticate` 方法。认证成功后返回 `Subject` 对象，其中包含用户的权限列表。
+
+权限检查通过 `CheckPermission` 方法实现，支持通配符匹配。例如，如果用户拥有 `posts:*` 权限，则可以访问所有文章相关的资源。权限检查在业务逻辑层调用，确保每个敏感操作都经过授权验证。
+
+```mermaid
+classDiagram
+class AuthManager {
+<<interface>>
++RegisterStrategy(strategy AuthStrategy) error
++Authenticate(ctx context.Context, strategyName string, credentials interface{}) (*Subject, error)
++GetTokenManager() TokenManager
++CheckPermission(ctx context.Context, subject *Subject, resource string, action string) error
+}
+class DefaultAuthManager {
+-config *AuthConfig
+-strategies map[string]AuthStrategy
+-tokenManager TokenManager
+-logger *log.Helper
++RegisterStrategy()
++Authenticate()
++GetTokenManager()
++CheckPermission()
+}
+class TokenManager {
+<<interface>>
++GenerateToken(ctx context.Context, subject *Subject, tokenType TokenType) (*Token, error)
++VerifyToken(ctx context.Context, tokenValue string) (*Subject, error)
++RevokeToken(ctx context.Context, tokenValue string) error
++RefreshToken(ctx context.Context, refreshToken string) (*Token, error)
+}
+class JWTTokenManager {
+-config *JWTConfig
+-logger *log.Helper
++GenerateToken()
++VerifyToken()
++RevokeToken()
++RefreshToken()
+}
+class AuthStrategy {
+<<interface>>
++Authenticate(ctx context.Context, credentials interface{}) (*Subject, error)
++GetName() string
+}
+class PasswordAuthStrategy {
+-userRepo UserRepository
+-logger *log.Helper
++Authenticate()
++GetName()
+}
+AuthManager <|-- DefaultAuthManager
+TokenManager <|-- JWTTokenManager
+AuthStrategy <|-- PasswordAuthStrategy
+DefaultAuthManager o-- JWTTokenManager
+DefaultAuthManager o-- "1..*" PasswordAuthStrategy
+DefaultAuthManager --> Subject
+JWTTokenManager --> Token
+PasswordAuthStrategy --> User
+class Subject {
+-ID string
+-Type string
+-Attributes map[string]string
+-Permissions []string
+-Roles []string
+-ExpiresAt time.Time
+}
+class Token {
+-Type TokenType
+-Value string
+-ExpiresAt time.Time
+-Subject *Subject
+}
+class User {
+-ID string
+-Username string
+-Password string
+-Roles []string
+-Permissions []string
+-Status string
+}
+```
+
+**图源**
+- [auth.go](file://internal/pkg/auth/auth.go#L85-L90)
+- [auth.go](file://internal/pkg/auth/auth.go#L160-L163)
+- [strategies.go](file://internal/pkg/auth/strategies.go#L32-L35)
+- [auth.go](file://internal/pkg/auth/auth.go#L106-L119)
+- [auth.go](file://internal/pkg/auth/auth.go#L122-L136)
+- [auth.go](file://internal/pkg/auth/auth.go#L174-L220)
+- [strategies.go](file://internal/pkg/auth/strategies.go#L51-L86)
+
+认证中间件 `AuthMiddleware` 负责在 HTTP 请求处理链中执行认证。它从请求头中提取 JWT 令牌，通过 `TokenManager` 进行验证，并将认证后的 `Subject` 放入上下文，供后续处理函数使用。中间件支持配置跳过路径（如登录接口）和自定义头部名称。
+
+**本节来源**
+- [auth.go](file://internal/pkg/auth/auth.go#L1-L300)
+- [middleware.go](file://internal/pkg/auth/middleware.go#L1-L110)
+- [strategies.go](file://internal/pkg/auth/strategies.go#L1-L86)
+- [example.go](file://internal/pkg/auth/example.go#L1-L86)
 
 ## 敏感数据处理
 
@@ -475,29 +591,4 @@ StrategyEvaluator <|-- SimpleStrategy
 StrategyEvaluator <|-- PercentageStrategy
 StrategyEvaluator <|-- UserStrategy
 StrategyEvaluator <|-- TimeStrategy
-StrategyEvaluator <|-- EnvironmentStrategy
-ToggleManager o-- FeatureRepository
-ToggleManager o-- StrategyEvaluator
-```
-
-**图源**
-- [toggle_manager.go](file://internal/pkg/feature/toggle_manager.go#L1-L643)
-- [file_repository.go](file://internal/pkg/feature/file_repository.go#L1-L595)
-- [interfaces.go](file://internal/pkg/feature/interfaces.go#L1-L238)
-- [strategies.go](file://internal/pkg/feature/strategies.go#L1-L278)
-
-`ToggleManager` 类是功能开关系统的核心，负责加载、评估和管理所有功能开关。它从 `FeatureRepository`（在本例中为 `FileRepository`）加载配置，并使用 `StrategyEvaluator`（在本例中为 `CompositeStrategy`）根据当前上下文评估每个开关。`EvaluationContext` 包含用户 ID、用户类型、环境和版本等信息，用于基于用户属性或环境的策略。
-
-该系统的一个关键安全特性是 `FeatureCapabilities` 结构，它将功能开关与具体的权限点、API、路由、配置和审计日志类型相关联。例如，`user.management` 功能开关可能包含 `user.create`、`user.update` 等权限点，以及 `user_created`、`user_updated` 等审计日志类型。这允许细粒度的访问控制和审计，确保只有在相关功能开关启用时才允许访问特定资源。
-
-功能开关系统通过 `api/feature/v1/feature.proto` 中定义的 gRPC 服务公开，提供 `ListToggles`、`GetToggle`、`UpdateToggle`、`EnableToggle`、`DisableToggle` 和 `DeleteToggle` 等操作。这些操作受认证和授权保护，确保只有授权用户才能修改功能开关配置。
-
-该系统还支持动态配置和运行时更新。`FileRepository` 使用 `fsnotify` 监听配置文件的更改，并在检测到更改时自动重新加载开关。`ToggleManager` 支持通过 `Subscribe` 方法订阅变更事件，允许其他系统组件（如缓存或安全监控）对功能开关的更改做出反应。
-
-**本节来源**
-- [config.yaml](file://configs/config.yaml#L1-L47)
-- [feature.proto](file://api/feature/v1/feature.proto#L1-L181)
-- [toggle_manager.go](file://internal/pkg/feature/toggle_manager.go#L1-L643)
-- [file_repository.go](file://internal/pkg/feature/file_repository.go#L1-L595)
-- [interfaces.go](file://internal/pkg/feature/interfaces.go#L1-L238)
-- [strategies.go](file://internal/pkg/feature/strategies.go#L1-L278)
+StrategyEvaluator

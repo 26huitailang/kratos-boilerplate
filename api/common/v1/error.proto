@@ -1,0 +1,154 @@
+syntax = "proto3";
+
+package common.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "kratos-boilerplate/api/common/v1;v1";
+
+// 统一错误响应格式
+// @description 标准化的错误响应结构，用于所有API的错误返回
+message ErrorResponse {
+  // HTTP状态码
+  // @example 400
+  // @minimum 100
+  // @maximum 599
+  int32 status = 1;
+  
+  // 业务错误码，用于客户端程序化处理
+  // @example "VALIDATION_ERROR"
+  // @required
+  string code = 2;
+  
+  // 错误消息，面向用户的友好描述
+  // @example "请求参数验证失败"
+  // @required
+  string message = 3;
+  
+  // 详细错误信息，包含具体的错误原因
+  // @example "用户名长度必须在3-32位之间"
+  string detail = 4;
+  
+  // 链路追踪ID，用于问题排查
+  // @example "trace-12345-abcde"
+  string trace_id = 5;
+  
+  // 错误发生时间
+  // @example "2025-01-10T10:00:00Z"
+  google.protobuf.Timestamp timestamp = 6;
+  
+  // 错误字段信息，用于表单验证错误
+  repeated FieldError field_errors = 7;
+  
+  // 建议的解决方案或下一步操作
+  // @example "请检查用户名格式并重新提交"
+  string suggestion = 8;
+  
+  // 帮助文档链接
+  // @example "https://docs.example.com/api/errors#VALIDATION_ERROR"
+  string help_url = 9;
+}
+
+// 字段级错误信息
+// @description 用于表单验证等场景的字段级错误详情
+message FieldError {
+  // 字段名称
+  // @example "username"
+  // @required
+  string field = 1;
+  
+  // 字段错误码
+  // @example "LENGTH_INVALID"
+  // @required
+  string code = 2;
+  
+  // 字段错误消息
+  // @example "用户名长度必须在3-32位之间"
+  // @required
+  string message = 3;
+  
+  // 字段当前值（敏感信息会被脱敏）
+  // @example "ab"
+  string value = 4;
+}
+
+// 业务错误码定义
+// @description 标准化的业务错误码，用于客户端程序化处理
+enum ErrorCode {
+  // 未知错误
+  UNKNOWN = 0;
+  
+  // 请求参数错误 (4xx)
+  INVALID_REQUEST = 1000;
+  VALIDATION_ERROR = 1001;
+  MISSING_PARAMETER = 1002;
+  INVALID_PARAMETER = 1003;
+  
+  // 认证授权错误 (401, 403)
+  UNAUTHORIZED = 2000;
+  INVALID_TOKEN = 2001;
+  TOKEN_EXPIRED = 2002;
+  FORBIDDEN = 2003;
+  INSUFFICIENT_PERMISSION = 2004;
+  
+  // 资源错误 (404, 409)
+  NOT_FOUND = 3000;
+  RESOURCE_NOT_FOUND = 3001;
+  CONFLICT = 3002;
+  RESOURCE_ALREADY_EXISTS = 3003;
+  
+  // 业务逻辑错误 (422)
+  BUSINESS_ERROR = 4000;
+  ACCOUNT_LOCKED = 4001;
+  CAPTCHA_INVALID = 4002;
+  PASSWORD_WEAK = 4003;
+  FEATURE_DISABLED = 4004;
+  QUOTA_EXCEEDED = 4005;
+  
+  // 系统错误 (5xx)
+  INTERNAL_ERROR = 5000;
+  SERVICE_UNAVAILABLE = 5001;
+  TIMEOUT = 5002;
+  DATABASE_ERROR = 5003;
+  EXTERNAL_SERVICE_ERROR = 5004;
+}
+
+// 分页错误响应
+// @description 分页查询相关的错误信息
+message PaginationError {
+  // 错误码
+  ErrorCode code = 1;
+  
+  // 错误消息
+  string message = 2;
+  
+  // 当前页码
+  int32 current_page = 3;
+  
+  // 最大页码
+  int32 max_page = 4;
+  
+  // 每页大小限制
+  int32 max_page_size = 5;
+}
+
+// 验证错误详情
+// @description 用于复杂验证场景的详细错误信息
+message ValidationErrorDetail {
+  // 验证规则名称
+  // @example "min_length"
+  string rule = 1;
+  
+  // 期望值
+  // @example "3"
+  string expected = 2;
+  
+  // 实际值
+  // @example "2"
+  string actual = 3;
+  
+  // 错误消息
+  // @example "长度不能少于3位"
+  string message = 4;
+}

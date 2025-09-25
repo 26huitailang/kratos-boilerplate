@@ -1,7 +1,7 @@
-# Authentication API
+# 认证API
 
 <cite>
-**Referenced Files in This Document**   
+**本文档引用的文件**   
 - [auth.proto](file://api/auth/v1/auth.proto#L1-L155)
 - [auth.go](file://internal/service/auth.go#L1-L234)
 - [auth.go](file://internal/biz/auth.go#L1-L694)
@@ -10,54 +10,54 @@
 - [error_reason.proto](file://api/helloworld/v1/error_reason.proto#L1-L17)
 </cite>
 
-## Table of Contents
-1. [Authentication API Endpoints](#authentication-api-endpoints)
-2. [Request/Response Schemas](#requestresponse-schemas)
-3. [gRPC to REST Mapping](#grpc-to-rest-mapping)
-4. [Input Validation](#input-validation)
-5. [Authentication and Token Management](#authentication-and-token-management)
-6. [Error Handling](#error-handling)
-7. [Captcha Integration](#captcha-integration)
-8. [Security Considerations](#security-considerations)
-9. [Client Implementation Examples](#client-implementation-examples)
+## 目录
+1. [认证API端点](#认证api端点)
+2. [请求/响应模式](#请求响应模式)
+3. [gRPC到REST映射](#grpc到rest映射)
+4. [输入验证](#输入验证)
+5. [认证和令牌管理](#认证和令牌管理)
+6. [错误处理](#错误处理)
+7. [验证码集成](#验证码集成)
+8. [安全考虑](#安全考虑)
+9. [客户端实现示例](#客户端实现示例)
 
-## Authentication API Endpoints
+## 认证API端点
 
-The Authentication API provides comprehensive user authentication functionality including registration, login, token refresh, and logout operations. The API is defined using Protocol Buffers and supports both gRPC and RESTful access patterns through HTTP annotations.
+认证API提供全面的用户认证功能，包括注册、登录、令牌刷新和注销操作。该API使用协议缓冲区定义，并通过HTTP注解支持gRPC和RESTful访问模式。
 
-### User Registration
-Registers a new user account with username, password, email, and phone number. Requires captcha verification.
+### 用户注册
+使用用户名、密码、邮箱和电话号码注册新用户账户。需要验证码验证。
 
-### User Login
-Authenticates user credentials and returns JWT access and refresh tokens upon successful authentication.
+### 用户登录
+验证用户凭据，并在成功认证后返回JWT访问令牌和刷新令牌。
 
-### Refresh Token
-Generates new access and refresh tokens using a valid refresh token, extending the user's authenticated session.
+### 刷新令牌
+使用有效的刷新令牌生成新的访问和刷新令牌，延长用户的认证会话。
 
-### Logout
-Terminates the user's current session by invalidating the access token and associated refresh tokens.
+### 注销
+通过使访问令牌和相关刷新令牌失效来终止用户的当前会话。
 
-### Get Captcha
-Generates a captcha for security verification, supporting image, SMS, and email types.
+### 获取验证码
+为安全验证生成验证码，支持图像、短信和邮件类型。
 
-### Verify Captcha
-Validates user-provided captcha code against the stored captcha value.
+### 验证验证码
+将用户提供的验证码与存储的验证码值进行验证。
 
-### Lock Status
-Retrieves the account lock status for a given username, including failed attempt count and unlock time.
+### 锁定状态
+检索给定用户名的账户锁定状态，包括失败尝试次数和解锁时间。
 
 **Section sources**
 - [auth.proto](file://api/auth/v1/auth.proto#L1-L155)
 - [auth.go](file://internal/service/auth.go#L1-L234)
 
-## Request/Response Schemas
+## 请求/响应模式
 
-### User Register
+### 用户注册
 
-**HTTP Method**: POST  
-**URL Pattern**: `/api/v1/auth/register`
+**HTTP方法**: POST  
+**URL模式**: `/api/v1/auth/register`
 
-#### Request Schema (JSON)
+#### 请求模式 (JSON)
 ```json
 {
   "username": "string",
@@ -69,7 +69,7 @@ Retrieves the account lock status for a given username, including failed attempt
 }
 ```
 
-#### Request Schema (gRPC)
+#### 请求模式 (gRPC)
 ```protobuf
 message RegisterRequest {
   string username = 1;
@@ -81,26 +81,26 @@ message RegisterRequest {
 }
 ```
 
-#### Response Schema (JSON)
+#### 响应模式 (JSON)
 ```json
 {
   "message": "string"
 }
 ```
 
-#### Response Schema (gRPC)
+#### 响应模式 (gRPC)
 ```protobuf
 message RegisterReply {
   string message = 1;
 }
 ```
 
-### User Login
+### 用户登录
 
-**HTTP Method**: POST  
-**URL Pattern**: `/api/v1/auth/login`
+**HTTP方法**: POST  
+**URL模式**: `/api/v1/auth/login`
 
-#### Request Schema (JSON)
+#### 请求模式 (JSON)
 ```json
 {
   "username": "string",
@@ -111,7 +111,7 @@ message RegisterReply {
 }
 ```
 
-#### Request Schema (gRPC)
+#### 请求模式 (gRPC)
 ```protobuf
 message LoginRequest {
   string username = 1;
@@ -122,7 +122,7 @@ message LoginRequest {
 }
 ```
 
-#### Response Schema (JSON)
+#### 响应模式 (JSON)
 ```json
 {
   "access_token": "string",
@@ -131,7 +131,7 @@ message LoginRequest {
 }
 ```
 
-#### Response Schema (gRPC)
+#### 响应模式 (gRPC)
 ```protobuf
 message LoginReply {
   string access_token = 1;
@@ -140,26 +140,26 @@ message LoginReply {
 }
 ```
 
-### Refresh Token
+### 刷新令牌
 
-**HTTP Method**: POST  
-**URL Pattern**: `/api/v1/auth/refresh`
+**HTTP方法**: POST  
+**URL模式**: `/api/v1/auth/refresh`
 
-#### Request Schema (JSON)
+#### 请求模式 (JSON)
 ```json
 {
   "refresh_token": "string"
 }
 ```
 
-#### Request Schema (gRPC)
+#### 请求模式 (gRPC)
 ```protobuf
 message RefreshTokenRequest {
   string refresh_token = 1;
 }
 ```
 
-#### Response Schema (JSON)
+#### 响应模式 (JSON)
 ```json
 {
   "access_token": "string",
@@ -168,7 +168,7 @@ message RefreshTokenRequest {
 }
 ```
 
-#### Response Schema (gRPC)
+#### 响应模式 (gRPC)
 ```protobuf
 message RefreshTokenReply {
   string access_token = 1;
@@ -177,29 +177,29 @@ message RefreshTokenReply {
 }
 ```
 
-### Logout
+### 注销
 
-**HTTP Method**: POST  
-**URL Pattern**: `/api/v1/auth/logout`
+**HTTP方法**: POST  
+**URL模式**: `/api/v1/auth/logout`
 
-#### Request Schema (JSON)
+#### 请求模式 (JSON)
 ```json
 {}
 ```
 
-#### Request Schema (gRPC)
+#### 请求模式 (gRPC)
 ```protobuf
 message LogoutRequest {}
 ```
 
-#### Response Schema (JSON)
+#### 响应模式 (JSON)
 ```json
 {
   "success": "boolean"
 }
 ```
 
-#### Response Schema (gRPC)
+#### 响应模式 (gRPC)
 ```protobuf
 message LogoutReply {
   bool success = 1;
@@ -209,19 +209,19 @@ message LogoutReply {
 **Section sources**
 - [auth.proto](file://api/auth/v1/auth.proto#L1-L155)
 
-## gRPC to REST Mapping
+## gRPC到REST映射
 
-The Authentication API uses google.api.http annotations to map gRPC methods to RESTful HTTP endpoints, enabling both gRPC and HTTP/JSON access to the same service.
+认证API使用google.api.http注解将gRPC方法映射到RESTful HTTP端点，从而实现对同一服务的gRPC和HTTP/JSON访问。
 
 ```mermaid
 flowchart TD
-A["gRPC Method: Register"] --> B["HTTP POST /api/v1/auth/register"]
-C["gRPC Method: Login"] --> D["HTTP POST /api/v1/auth/login"]
-E["gRPC Method: RefreshToken"] --> F["HTTP POST /api/v1/auth/refresh"]
-G["gRPC Method: Logout"] --> H["HTTP POST /api/v1/auth/logout"]
-I["gRPC Method: GetCaptcha"] --> J["HTTP GET /api/v1/auth/captcha"]
-K["gRPC Method: VerifyCaptcha"] --> L["HTTP POST /api/v1/auth/captcha/verify"]
-M["gRPC Method: LockStatus"] --> N["HTTP GET /api/v1/auth/lock-status/{username}"]
+A["gRPC 方法: Register"] --> B["HTTP POST /api/v1/auth/register"]
+C["gRPC 方法: Login"] --> D["HTTP POST /api/v1/auth/login"]
+E["gRPC 方法: RefreshToken"] --> F["HTTP POST /api/v1/auth/refresh"]
+G["gRPC 方法: Logout"] --> H["HTTP POST /api/v1/auth/logout"]
+I["gRPC 方法: GetCaptcha"] --> J["HTTP GET /api/v1/auth/captcha"]
+K["gRPC 方法: VerifyCaptcha"] --> L["HTTP POST /api/v1/auth/captcha/verify"]
+M["gRPC 方法: LockStatus"] --> N["HTTP GET /api/v1/auth/lock-status/{username}"]
 style A fill:#f9f,stroke:#333
 style B fill:#bbf,stroke:#333
 style C fill:#f9f,stroke:#333
@@ -236,41 +236,41 @@ style K fill:#f9f,stroke:#333
 style L fill:#bbf,stroke:#333
 style M fill:#f9f,stroke:#333
 style N fill:#bbf,stroke:#333
-click A "#authentication-api-endpoints"
-click B "#authentication-api-endpoints"
-click C "#authentication-api-endpoints"
-click D "#authentication-api-endpoints"
-click E "#authentication-api-endpoints"
-click F "#authentication-api-endpoints"
-click G "#authentication-api-endpoints"
-click H "#authentication-api-endpoints"
-click I "#authentication-api-endpoints"
-click J "#authentication-api-endpoints"
-click K "#authentication-api-endpoints"
-click L "#authentication-api-endpoints"
-click M "#authentication-api-endpoints"
-click N "#authentication-api-endpoints"
+click A "#认证api端点"
+click B "#认证api端点"
+click C "#认证api端点"
+click D "#认证api端点"
+click E "#认证api端点"
+click F "#认证api端点"
+click G "#认证api端点"
+click H "#认证api端点"
+click I "#认证api端点"
+click J "#认证api端点"
+click K "#认证api端点"
+click L "#认证api端点"
+click M "#认证api端点"
+click N "#认证api端点"
 ```
 
 **Diagram sources**
 - [auth.proto](file://api/auth/v1/auth.proto#L1-L155)
 
-## Input Validation
+## 输入验证
 
-The API implements comprehensive input validation using the validate.proto rules to ensure data integrity and security.
+该API使用validate.proto规则实现全面的输入验证，以确保数据完整性和安全性。
 
-### Validation Rules
+### 验证规则
 
-#### String Fields
-- **Username**: Must be 3-20 characters, alphanumeric with underscores
-- **Password**: Minimum 8 characters with complexity requirements
-- **Email**: Valid email format
-- **Phone**: Valid phone number format
-- **Captcha ID/Code**: Required and non-empty
+#### 字符串字段
+- **用户名**: 必须为3-20个字符，字母数字加下划线
+- **密码**: 最少8个字符并满足复杂性要求
+- **邮箱**: 有效邮箱格式
+- **电话**: 有效电话号码格式
+- **验证码ID/代码**: 必填且非空
 
-#### Field-Level Validation
+#### 字段级验证
 ```protobuf
-// Example validation rules that would be applied
+// 应用的示例验证规则
 message RegisterRequest {
   string username = 1 [(validate.rules).string = {
     min_len: 3,
@@ -302,11 +302,11 @@ message RegisterRequest {
 - [validate.proto](file://third_party/validate/validate.proto#L1-L864)
 - [auth.proto](file://api/auth/v1/auth.proto#L1-L155)
 
-## Authentication and Token Management
+## 认证和令牌管理
 
-The authentication system implements JWT-based token management with access and refresh token flows for secure session handling.
+认证系统实现基于JWT的令牌管理，采用访问令牌和刷新令牌流程进行安全会话处理。
 
-### Token Generation Flow
+### 令牌生成流程
 
 ```mermaid
 sequenceDiagram
@@ -314,23 +314,23 @@ participant Client
 participant AuthService
 participant AuthUsecase
 participant UserRepo
-Client->>AuthService : Login Request
-AuthService->>AuthUsecase : Validate credentials
+Client->>AuthService : 登录请求
+AuthService->>AuthUsecase : 验证凭据
 AuthUsecase->>UserRepo : GetUser(username)
-UserRepo-->>AuthUsecase : User data
+UserRepo-->>AuthUsecase : 用户数据
 AuthUsecase->>AuthUsecase : bcrypt.CompareHashAndPassword()
 AuthUsecase->>AuthUsecase : generateTokens()
 AuthUsecase->>UserRepo : SaveRefreshToken()
-AuthUsecase-->>AuthService : TokenPair
-AuthService-->>Client : Access & Refresh Tokens
-Note over AuthService,AuthUsecase : JWT tokens generated with HS256 signing
+AuthUsecase-->>AuthService : 令牌对
+AuthService-->>Client : 访问&刷新令牌
+Note over AuthService,AuthUsecase : 使用HS256签名生成JWT令牌
 ```
 
 **Diagram sources**
 - [auth.go](file://internal/service/auth.go#L1-L234)
 - [auth.go](file://internal/biz/auth.go#L1-L694)
 
-### Token Refresh Flow
+### 令牌刷新流程
 
 ```mermaid
 sequenceDiagram
@@ -338,50 +338,50 @@ participant Client
 participant AuthService
 participant AuthUsecase
 participant UserRepo
-Client->>AuthService : RefreshToken Request
+Client->>AuthService : RefreshToken 请求
 AuthService->>AuthUsecase : parseRefreshToken()
 AuthUsecase->>UserRepo : GetRefreshToken(tokenID)
-UserRepo-->>AuthUsecase : Token status
-AuthUsecase->>AuthUsecase : Validate token not reused
+UserRepo-->>AuthUsecase : 令牌状态
+AuthUsecase->>AuthUsecase : 验证令牌未被重用
 AuthUsecase->>UserRepo : InvalidateRefreshToken()
 AuthUsecase->>UserRepo : GetUser(username)
 AuthUsecase->>AuthUsecase : generateTokens()
-AuthUsecase-->>AuthService : New TokenPair
-AuthService-->>Client : New Access & Refresh Tokens
-Note over AuthService,AuthUsecase : Prevents refresh token reuse attacks
+AuthUsecase-->>AuthService : 新令牌对
+AuthService-->>Client : 新访问&刷新令牌
+Note over AuthService,AuthUsecase : 防止刷新令牌重用攻击
 ```
 
 **Diagram sources**
 - [auth.go](file://internal/service/auth.go#L1-L234)
 - [auth.go](file://internal/biz/auth.go#L1-L694)
 
-### Token Configuration
-- **Access Token**: 15 minutes expiration
-- **Refresh Token**: 7 days expiration
-- **Signing Algorithm**: HS256 with 256-bit secret key
-- **Token Storage**: Refresh tokens stored in database with usage tracking
+### 令牌配置
+- **访问令牌**: 15分钟过期
+- **刷新令牌**: 7天过期
+- **签名算法**: HS256带256位密钥
+- **令牌存储**: 刷新令牌存储在数据库中并跟踪使用情况
 
-## Error Handling
+## 错误处理
 
-The API implements comprehensive error handling with specific error codes and appropriate HTTP status mappings.
+该API实现全面的错误处理，具有特定的错误代码和适当的HTTP状态映射。
 
-### Error Codes and HTTP Status Mappings
+### 错误代码和HTTP状态映射
 
-| Error Code | HTTP Status | Description |
+| 错误代码 | HTTP状态 | 描述 |
 |------------|-------------|-------------|
-| USER_NOT_FOUND | 404 Not Found | Username does not exist |
-| PASSWORD_INCORRECT | 401 Unauthorized | Password is incorrect |
-| CAPTCHA_REQUIRED | 400 Bad Request | Captcha is required for this operation |
-| CAPTCHA_INVALID | 400 Bad Request | Captcha code is invalid |
-| CAPTCHA_EXPIRED | 400 Bad Request | Captcha has expired |
-| ACCOUNT_LOCKED | 403 Forbidden | Account is locked due to too many failed attempts |
-| TOKEN_INVALID | 401 Unauthorized | Token is malformed or invalid |
-| TOKEN_EXPIRED | 401 Unauthorized | Token has expired |
-| USER_EXISTS | 400 Bad Request | Username already exists |
+| USER_NOT_FOUND | 404 未找到 | 用户名不存在 |
+| PASSWORD_INCORRECT | 401 未授权 | 密码不正确 |
+| CAPTCHA_REQUIRED | 400 错误请求 | 此操作需要验证码 |
+| CAPTCHA_INVALID | 400 错误请求 | 验证码无效 |
+| CAPTCHA_EXPIRED | 400 错误请求 | 验证码已过期 |
+| ACCOUNT_LOCKED | 403 禁止 | 由于太多失败尝试，账户已被锁定 |
+| TOKEN_INVALID | 401 未授权 | 令牌格式错误或无效 |
+| TOKEN_EXPIRED | 401 未授权 | 令牌已过期 |
+| USER_EXISTS | 400 错误请求 | 用户名已存在 |
 
-### Error Response Schema
+### 错误响应模式
 
-#### JSON Format
+#### JSON格式
 ```json
 {
   "error": {
@@ -393,9 +393,9 @@ The API implements comprehensive error handling with specific error codes and ap
 }
 ```
 
-#### gRPC Format
+#### gRPC格式
 ```protobuf
-// Defined in third_party/errors/errors.proto
+// 在third_party/errors/errors.proto中定义
 extend google.protobuf.EnumOptions {
   int32 default_code = 1108;
 }
@@ -409,28 +409,28 @@ extend google.protobuf.EnumValueOptions {
 - [auth.go](file://internal/service/auth.go#L1-L234)
 - [error_reason.proto](file://api/helloworld/v1/error_reason.proto#L1-L17)
 
-## Captcha Integration
+## 验证码集成
 
-The authentication system integrates captcha functionality to prevent automated attacks and bot registrations.
+认证系统集成验证码功能，以防止自动化攻击和机器人注册。
 
-### Captcha Types Supported
-- **Image Captcha**: Base64-encoded image data returned in response
-- **SMS Captcha**: Sent to mobile phone number
-- **Email Captcha**: Sent to email address
+### 支持的验证码类型
+- **图像验证码**: 返回base64编码的图像数据
+- **短信验证码**: 发送到手机号码
+- **邮件验证码**: 发送到邮箱地址
 
-### Captcha Workflow
+### 验证码工作流程
 
 ```mermaid
 flowchart TD
-A["Client: GetCaptcha Request"] --> B["Server: Generate captcha ID and code"]
-B --> C["Store captcha in repository"]
-C --> D["Return captcha ID and image data (if image type)"]
-D --> E["Client: Display captcha to user"]
-E --> F["Client: Submit captcha verification"]
-F --> G["Server: Verify captcha ID and code"]
-G --> H{"Valid?"}
-H --> |Yes| I["Mark captcha as used", "Return success"]
-H --> |No| J["Return validation error"]
+A["客户端: GetCaptcha 请求"] --> B["服务器: 生成验证码ID和代码"]
+B --> C["在仓库中存储验证码"]
+C --> D["返回验证码ID和图像数据(如果是图像类型)"]
+D --> E["客户端: 向用户显示验证码"]
+E --> F["客户端: 提交验证码验证"]
+F --> G["服务器: 验证验证码ID和代码"]
+G --> H{"有效?"}
+H --> |是| I["标记验证码为已使用", "返回成功"]
+H --> |否| J["返回验证错误"]
 style A fill:#f9f,stroke:#333
 style B fill:#ff7,stroke:#333
 style C fill:#ff7,stroke:#333
@@ -447,52 +447,52 @@ style J fill:#f99,stroke:#333
 - [auth.proto](file://api/auth/v1/auth.proto#L1-L155)
 - [auth.go](file://internal/biz/auth.go#L1-L694)
 
-## Security Considerations
+## 安全考虑
 
-The authentication system implements multiple security measures to protect user accounts and prevent common attacks.
+认证系统实施多种安全措施来保护用户账户并防止常见攻击。
 
-### Password Security
-- **Hashing**: Passwords are hashed using bcrypt with default cost
-- **Storage**: Hashed passwords stored in database, never plaintext
-- **Strength**: Minimum 8-character length requirement
+### 密码安全
+- **哈希**: 使用bcrypt默认成本对密码进行哈希
+- **存储**: 数据库中存储哈希密码，从不存储明文
+- **强度**: 要求最小8字符长度
 
-### Account Protection
-- **Account Locking**: Account locked after 5 failed login attempts
-- **Lock Duration**: 30 minutes lockout period
-- **Failed Attempt Tracking**: Tracks failed attempts with timestamps
+### 账户保护
+- **账户锁定**: 5次登录失败后锁定账户
+- **锁定时长**: 30分钟锁定期
+- **失败尝试跟踪**: 跟踪带时间戳的失败尝试
 
-### Session Security
-- **Token Blacklisting**: Access tokens added to blacklist on logout
-- **Refresh Token Rotation**: New refresh token issued on each refresh
-- **Refresh Token Reuse Detection**: Detects and prevents token reuse attacks
+### 会话安全
+- **令牌黑名单**: 注销时将访问令牌添加到黑名单
+- **刷新令牌轮换**: 每次刷新时颁发新刷新令牌
+- **刷新令牌重用检测**: 检测并防止令牌重用攻击
 
-### Attack Prevention
-- **Brute Force Protection**: Account locking prevents password guessing
-- **CSRF Protection**: JWT tokens in Authorization header (not cookies)
-- **Rate Limiting**: Captcha required for sensitive operations
-- **Data Encryption**: Sensitive user data encrypted at rest using KMS
+### 攻击预防
+- **暴力破解防护**: 账户锁定防止密码猜测
+- **CSRF防护**: JWT令牌在Authorization头中（不在cookie中）
+- **速率限制**: 敏感操作需要验证码
+- **数据加密**: 使用KMS对静态敏感用户数据加密
 
-### Sensitive Data Handling
-- **Email/Phone Encryption**: Personal information encrypted in database
-- **Data Hashing**: Hashes stored for lookup without revealing plaintext
-- **Logging Anonymization**: Sensitive fields redacted in logs
+### 敏感数据处理
+- **邮箱/电话加密**: 数据库中加密个人信息
+- **数据哈希**: 存储用于查找的哈希而不暴露明文
+- **日志匿名化**: 日志中屏蔽敏感字段
 
 ```mermaid
 graph TB
-A[Security Features] --> B[Password Hashing]
-A --> C[Account Locking]
-A --> D[Token Blacklisting]
-A --> E[Refresh Token Rotation]
-A --> F[Sensitive Data Encryption]
-A --> G[Brute Force Protection]
-A --> H[CSRF Protection]
-B --> I[bcrypt hashing]
-C --> J[5 attempts max]
-D --> K[Memory blacklist]
-E --> L[One-time use]
-F --> M[KMS encryption]
-G --> N[Account lockout]
-H --> O[Header-based tokens]
+A[安全特性] --> B[密码哈希]
+A --> C[账户锁定]
+A --> D[令牌黑名单]
+A --> E[刷新令牌轮换]
+A --> F[敏感数据加密]
+A --> G[暴力破解防护]
+A --> H[CSRF防护]
+B --> I[bcrypt哈希]
+C --> J[最多5次尝试]
+D --> K[内存黑名单]
+E --> L[一次性使用]
+F --> M[KMS加密]
+G --> N[账户锁定]
+H --> O[基于头的令牌]
 style A fill:#f96,stroke:#333
 style B fill:#69f,stroke:#333
 style C fill:#69f,stroke:#333
@@ -507,9 +507,9 @@ style H fill:#69f,stroke:#333
 - [auth.go](file://internal/biz/auth.go#L1-L694)
 - [auth.go](file://internal/data/auth.go#L1-L437)
 
-## Client Implementation Examples
+## 客户端实现示例
 
-### Go Client Example
+### Go客户端示例
 
 ```go
 package main
@@ -525,7 +525,7 @@ import (
 )
 
 func main() {
-    // Connect to authentication service
+    // 连接到认证服务
     conn, err := grpc.Dial("localhost:8000", grpc.WithTransportCredentials(insecure.NewCredentials()))
     if err != nil {
         panic(err)
@@ -534,7 +534,7 @@ func main() {
     
     client := v1.NewAuthClient(conn)
     
-    // Login request
+    // 登录请求
     ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
     defer cancel()
     
@@ -546,33 +546,33 @@ func main() {
     })
     
     if err != nil {
-        fmt.Printf("Login failed: %v\n", err)
+        fmt.Printf("登录失败: %v\n", err)
         return
     }
     
-    fmt.Printf("Access Token: %s\n", loginResp.AccessToken)
-    fmt.Printf("Expires in: %d seconds\n", loginResp.ExpiresIn)
+    fmt.Printf("访问令牌: %s\n", loginResp.AccessToken)
+    fmt.Printf("过期时间: %d 秒\n", loginResp.ExpiresIn)
     
-    // Use access token for authenticated requests
+    // 使用访问令牌进行认证请求
     authCtx := metadata.NewOutgoingContext(ctx, metadata.Pairs(
         "Authorization", "Bearer "+loginResp.AccessToken,
     ))
     
-    // Refresh token example
+    // 刷新令牌示例
     refreshResp, err := client.RefreshToken(ctx, &v1.RefreshTokenRequest{
         RefreshToken: loginResp.RefreshToken,
     })
     
     if err != nil {
-        fmt.Printf("Token refresh failed: %v\n", err)
+        fmt.Printf("令牌刷新失败: %v\n", err)
         return
     }
     
-    fmt.Printf("New Access Token: %s\n", refreshResp.AccessToken)
+    fmt.Printf("新访问令牌: %s\n", refreshResp.AccessToken)
 }
 ```
 
-### TypeScript Client Example
+### TypeScript客户端示例
 
 ```typescript
 // auth.service.ts
@@ -607,7 +607,7 @@ class AuthService {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.message || 'Login failed');
+      throw new Error(error.message || '登录失败');
     }
 
     const data = await response.json();
@@ -617,7 +617,7 @@ class AuthService {
 
   async refreshToken(): Promise<TokenPair> {
     if (!this.refreshToken) {
-      throw new Error('No refresh token available');
+      throw new Error('无可用刷新令牌');
     }
 
     const response = await fetch(`${this.baseUrl}/refresh`, {
@@ -630,7 +630,7 @@ class AuthService {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.message || 'Token refresh failed');
+      throw new Error(error.message || '令牌刷新失败');
     }
 
     const data = await response.json();
@@ -675,20 +675,20 @@ class AuthService {
   }
 }
 
-// Usage example
+// 使用示例
 const authService = new AuthService();
 
-// Login
+// 登录
 authService.login({
   username: 'testuser',
   password: 'password123',
   captcha_id: 'captcha123',
   captcha_code: 'ABC123'
 }).then(tokens => {
-  console.log('Login successful');
-  console.log('Access token:', tokens.access_token);
+  console.log('登录成功');
+  console.log('访问令牌:', tokens.access_token);
 }).catch(error => {
-  console.error('Login failed:', error.message);
+  console.error('登录失败:', error.message);
 });
 ```
 

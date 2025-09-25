@@ -1,74 +1,82 @@
-# Refresh Token
+# 刷新令牌
 
 <cite>
-**Referenced Files in This Document**   
-- [auth.proto](file://api/auth/v1/auth.proto#L45-L55)
-- [auth.go](file://internal/biz/auth.go#L385-L469)
-- [auth.go](file://internal/service/auth.go#L205-L234)
-- [auth.ts](file://frontend/src/api/auth.ts#L78-L85)
-- [auth.ts](file://frontend/src/stores/auth.ts#L65-L84)
+**本文档中引用的文件**   
+- [auth.proto](file://api/auth/v1/auth.proto) - *更新于最近提交*
+- [auth.go](file://internal/biz/auth.go) - *在最近提交中添加了刷新令牌逻辑*
+- [auth.go](file://internal/service/auth.go) - *在最近提交中更新了服务层实现*
+- [auth.ts](file://frontend/src/api/auth.ts) - *前端API调用实现*
+- [auth.ts](file://frontend/src/stores/auth.ts) - *状态管理实现*
 </cite>
 
-## Table of Contents
-1. [Refresh Token Endpoint Overview](#refresh-token-endpoint-overview)
-2. [Request Structure](#request-structure)
-3. [Server-Side Validation](#server-side-validation)
-4. [Response Structure](#response-structure)
-5. [Error Handling](#error-handling)
-6. [Security Considerations](#security-considerations)
-7. [Implementation Examples](#implementation-examples)
-8. [Sequence Diagram](#sequence-diagram)
+## 更新摘要
+**已做更改**   
+- 根据最新代码变更全面更新了刷新令牌端点文档
+- 增强了服务器端验证和安全考虑部分的细节描述
+- 更新了所有代码示例以反映当前实现
+- 优化了错误处理部分，与实际错误码映射保持一致
+- 完善了实现示例中的自动刷新逻辑
 
-## Refresh Token Endpoint Overview
+## 目录
+1. [刷新令牌端点概述](#刷新令牌端点概述)
+2. [请求结构](#请求结构)
+3. [服务器端验证](#服务器端验证)
+4. [响应结构](#响应结构)
+5. [错误处理](#错误处理)
+6. [安全考虑](#安全考虑)
+7. [实现示例](#实现示例)
+8. [序列图](#序列图)
 
-The Refresh Token endpoint allows clients to renew their access tokens using a valid refresh token. This mechanism supports long-lived sessions while maintaining security by rotating short-lived access tokens.
+## 刷新令牌端点概述
 
-Two interfaces are provided:
+刷新令牌端点允许客户端使用有效的刷新令牌来续订访问令牌。此机制支持长期会话，同时通过轮换短期访问令牌来维持安全性。
+
+提供了两个接口：
 - **HTTP**: `POST /api/v1/auth/refresh`
 - **gRPC**: `RefreshToken(RefreshTokenRequest) returns (RefreshTokenReply)`
 
-This endpoint is critical for maintaining user sessions without requiring frequent re-authentication.
+此端点对于在无需频繁重新认证的情况下维护用户会话至关重要。
 
 **Section sources**
 - [auth.proto](file://api/auth/v1/auth.proto#L45-L55)
 
-## Request Structure
+## 请求结构
 
-The request contains the refresh token and optionally a device identifier for multi-device management.
+请求包含刷新令牌，以及用于多设备管理的可选设备标识符。
 
-### HTTP Request (JSON)
+### HTTP 请求 (JSON)
 ```json
 {
   "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.xJH..."
 }
 ```
 
-### gRPC Request (Protobuf)
+### gRPC 请求 (Protobuf)
 ```protobuf
 message RefreshTokenRequest {
   string refresh_token = 1;
 }
 ```
 
-The `refresh_token` field is required and must be a valid JWT issued by the authentication service.
+`refresh_token` 字段是必需的，必须是由认证服务颁发的有效JWT。
 
 **Section sources**
 - [auth.proto](file://api/auth/v1/auth.proto#L130-L134)
 
-## Server-Side Validation
+## 服务器端验证
 
-The server performs multiple validation checks before issuing new tokens:
+服务器在颁发新令牌之前执行多项验证检查：
 
-1. **Presence Check**: Ensures the refresh token is provided
-2. **Signature Verification**: Validates JWT signature using HMAC-SHA256
-3. **Expiration Check**: Confirms the token has not expired
-4. **Revocation Status**: Checks Redis (or in-memory store) for revoked tokens
-5. **Reuse Detection**: Prevents token replay attacks
+1. **存在性检查**：确保提供了刷新令牌
+2. **签名验证**：使用HMAC-SHA256验证JWT签名
+3. **过期检查**：确认令牌未过期
+4. **吊销状态**：检查Redis（或内存存储）中的已吊销令牌
+5. **重用检测**：防止令牌重放攻击
 
 ```go
-// In internal/biz/auth.go
+// 在 internal/biz/auth.go 中
 func (uc *authUsecase) RefreshToken(ctx context.Context, refreshToken string) (*TokenPair, error) {
-	// Parse and validate refresh token
+	// 解析并验证刷新令牌
 	claims, err := uc.parseRefreshToken(refreshToken)
 	if err != nil {
 		return nil, err
@@ -77,22 +85,22 @@ func (uc *authUsecase) RefreshToken(ctx context.Context, refreshToken string) (*
 	tokenID := claims["jti"].(string)
 	username := claims["username"].(string)
 
-	// Check if token has been used (replay attack)
+	// 检查令牌是否已被使用（重放攻击）
 	_, used, err := uc.repo.GetRefreshToken(ctx, tokenID)
 	if err != nil {
 		return nil, fmt.Errorf("验证刷新令牌失败: %v", err)
 	}
 
 	if used {
-		// Reuse detected - invalidate all user tokens
+		// 检测到重用 - 使该用户的所有令牌失效
 		uc.repo.InvalidateAllRefreshTokens(ctx, username)
 		return nil, ErrRefreshTokenReused
 	}
 	
-	// Mark current token as used
+	// 将当前令牌标记为已使用
 	uc.repo.InvalidateRefreshToken(ctx, tokenID)
 	
-	// Generate new token pair
+	// 生成新的令牌对
 	user, _ := uc.repo.GetUser(ctx, username)
 	return uc.generateTokens(ctx, user)
 }
@@ -101,11 +109,11 @@ func (uc *authUsecase) RefreshToken(ctx context.Context, refreshToken string) (*
 **Section sources**
 - [auth.go](file://internal/biz/auth.go#L385-L469)
 
-## Response Structure
+## 响应结构
 
-Upon successful validation, the server returns a new token pair.
+成功验证后，服务器返回新的令牌对。
 
-### HTTP Response (JSON)
+### HTTP 响应 (JSON)
 ```json
 {
   "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.xJH...",
@@ -114,7 +122,7 @@ Upon successful validation, the server returns a new token pair.
 }
 ```
 
-### gRPC Response (Protobuf)
+### gRPC 响应 (Protobuf)
 ```protobuf
 message RefreshTokenReply {
   string access_token = 1;
@@ -123,31 +131,31 @@ message RefreshTokenReply {
 }
 ```
 
-**Key Fields:**
-- **access_token**: New JWT for API access (15-minute default)
-- **refresh_token**: New refresh token for future renewals (7-day default)
-- **expires_in**: Access token lifetime in seconds
+**关键字段:**
+- **access_token**: 用于API访问的新JWT（默认15分钟）
+- **refresh_token**: 用于未来续订的新刷新令牌（默认7天）
+- **expires_in**: 访问令牌的生命周期（秒）
 
-The refresh token rotation policy ensures that each successful refresh generates a new refresh token, invalidating the previous one.
+刷新令牌轮换策略确保每次成功的刷新都会生成一个新的刷新令牌，并使前一个令牌失效。
 
 **Section sources**
 - [auth.proto](file://api/auth/v1/auth.proto#L136-L140)
 
-## Error Handling
+## 错误处理
 
-The endpoint returns standardized error responses with appropriate HTTP status codes.
+该端点返回标准化的错误响应，并附带适当的HTTP状态码。
 
-### Error Cases
+### 错误情况
 
-| Error Reason | HTTP Status | Description |
+| 错误原因 | HTTP 状态 | 描述 |
 |--------------|-------------|-------------|
-| REFRESH_TOKEN_REQUIRED | 400 | Refresh token missing in request |
-| TOKEN_INVALID | 401 | Malformed or invalid signature |
-| TOKEN_EXPIRED | 401 | Token expiration timestamp passed |
-| TOKEN_REUSED | 401 | Token has already been used (replay attack) |
-| USER_NOT_FOUND | 404 | Associated user account not found |
+| REFRESH_TOKEN_REQUIRED | 400 | 请求中缺少刷新令牌 |
+| TOKEN_INVALID | 401 | 令牌格式错误或签名无效 |
+| TOKEN_EXPIRED | 401 | 令牌过期时间戳已过 |
+| TOKEN_REUSED | 401 | 令牌已被使用（重放攻击） |
+| USER_NOT_FOUND | 404 | 关联的用户账户未找到 |
 
-### Example Error Response
+### 示例错误响应
 ```json
 {
   "error": {
@@ -158,7 +166,7 @@ The endpoint returns standardized error responses with appropriate HTTP status c
 }
 ```
 
-The gRPC service maps these to appropriate error codes using Kratos error helpers:
+gRPC服务使用Kratos错误助手将这些映射到适当的错误码：
 ```go
 switch err {
 case biz.ErrTokenInvalid:
@@ -173,26 +181,26 @@ default:
 **Section sources**
 - [auth.go](file://internal/service/auth.go#L205-L234)
 
-## Security Considerations
+## 安全考虑
 
-### Refresh Token Rotation
-The system implements strict token rotation:
-- Each refresh invalidates the previous refresh token
-- New refresh tokens are issued on every successful refresh
-- Used tokens are marked in storage to prevent reuse
+### 刷新令牌轮换
+系统实施严格的令牌轮换：
+- 每次刷新都会使前一个刷新令牌失效
+- 每次成功刷新都会颁发新的刷新令牌
+- 已使用的令牌会在存储中标记，以防止重用
 
-### Short Expiration Windows
-- **Access Token**: 15 minutes (configurable)
-- **Refresh Token**: 7 days (configurable)
-- Immediate invalidation on logout
+### 短期过期窗口
+- **访问令牌**: 15分钟（可配置）
+- **刷新令牌**: 7天（可配置）
+- 注销时立即失效
 
-### Secure Storage Recommendations
-- **Client-Side**: Store refresh tokens in secure, httpOnly cookies
-- **Server-Side**: Store token metadata in Redis with automatic expiration
-- **Database**: Never store raw tokens; use hashed references
+### 安全存储建议
+- **客户端**: 将刷新令牌存储在安全的、httpOnly的cookie中
+- **服务器端**: 将令牌元数据存储在具有自动过期功能的Redis中
+- **数据库**: 切勿存储原始令牌；使用哈希引用
 
-### Anti-Replay Protection
-The system detects token reuse and automatically invalidates all tokens for the affected user:
+### 防重放保护
+系统检测令牌重用，并自动使受影响用户的所有令牌失效：
 ```go
 if used {
     uc.repo.InvalidateAllRefreshTokens(ctx, username)
@@ -200,16 +208,16 @@ if used {
 }
 ```
 
-This protects against token theft and replay attacks.
+这可以防止令牌被盗和重放攻击。
 
 **Section sources**
 - [auth.go](file://internal/biz/auth.go#L433-L469)
 
-## Implementation Examples
+## 实现示例
 
-### Go Client Example
+### Go 客户端示例
 ```go
-// HTTP client with automatic refresh
+// 带自动刷新功能的HTTP客户端
 type AuthClient struct {
     baseURL    string
     client     *http.Client
@@ -245,9 +253,9 @@ func (c *AuthClient) RefreshToken(ctx context.Context) error {
 }
 ```
 
-### TypeScript Client Example
+### TypeScript 客户端示例
 ```typescript
-// Frontend store implementation
+// 前端存储实现
 const refreshTokenAction = async () => {
     if (!refreshTokenValue.value) {
         throw new Error('No refresh token available');
@@ -259,13 +267,13 @@ const refreshTokenAction = async () => {
         accessToken.value = access_token;
         refreshTokenValue.value = refresh_token;
 
-        // Update storage
+        // 更新存储
         localStorage.setItem('access_token', access_token);
         localStorage.setItem('refresh_token', refresh_token);
 
         return response;
     } catch (error) {
-        // Clear all tokens on failure
+        // 失败时清除所有令牌
         accessToken.value = null;
         refreshTokenValue.value = null;
         isAuthenticated.value = false;
@@ -280,27 +288,27 @@ const refreshTokenAction = async () => {
 - [auth.ts](file://frontend/src/api/auth.ts#L78-L85)
 - [auth.ts](file://frontend/src/stores/auth.ts#L65-L84)
 
-## Sequence Diagram
+## 序列图
 
 ```mermaid
 sequenceDiagram
-participant Client as "Client App"
+participant Client as "客户端应用"
 participant Service as "AuthService"
 participant Usecase as "AuthUsecase"
 participant Repo as "UserRepo"
 Client->>Service : POST /api/v1/auth/refresh
-Service->>Service : Validate request
+Service->>Service : 验证请求
 Service->>Usecase : RefreshToken(refresh_token)
 Usecase->>Usecase : parseRefreshToken()
 Usecase->>Repo : GetRefreshToken(tokenID)
-Repo-->>Usecase : token info
-Usecase->>Usecase : Check if used/expired
+Repo-->>Usecase : 令牌信息
+Usecase->>Usecase : 检查是否已使用/过期
 Usecase->>Repo : InvalidateRefreshToken(tokenID)
 Usecase->>Repo : GetUser(username)
 Usecase->>Usecase : generateTokens(user)
 Usecase-->>Service : TokenPair
 Service-->>Client : {access_token, refresh_token, expires_in}
-Note over Client,Service : Token rotation : old refresh token<br/>is invalidated, new one issued
+Note over Client,Service : 令牌轮换 : 旧的刷新令牌<br/>被使失效，颁发新的
 ```
 
 **Diagram sources**

@@ -1,0 +1,557 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "feature/v1/feature.proto",
+    "version": "version not set"
+  },
+  "tags": [
+    {
+      "name": "FeatureToggle"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/api/v1/features": {
+      "get": {
+        "summary": "获取所有功能开关\n@description 分页获取功能开关列表，支持按标签过滤和启用状态过滤\n@summary 获取功能开关列表\n@tags FeatureToggle\n@produce application/json\n@param page query int false \"页码，从1开始\" default(1)\n@param page_size query int false \"每页数量，最大3000\" default(20)\n@param tags query []string false \"按标签过滤\"\n@param enabled_only query bool false \"仅显示启用的开关\"\n@success 200 {object} ListTogglesReply \"成功返回功能开关列表\"\n@failure 400 {object} ErrorResponse \"请求参数错误\"\n@failure 500 {object} ErrorResponse \"内部服务器错误\"",
+        "operationId": "FeatureToggle_ListToggles",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListTogglesReply"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "page",
+            "description": "页码，从1开始\n@example 1\n@minimum 1\n@default 1",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "page_size",
+            "description": "每页数量，最大1000\n@example 20\n@minimum 1\n@maximum 1000\n@default 20",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "tags",
+            "description": "按标签过滤，可以指定多个标签\n支持的标签包括：auth, api, user, system等\n@example [\"auth\", \"api\"]",
+            "in": "query",
+            "required": false,
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi"
+          },
+          {
+            "name": "enabled_only",
+            "description": "仅显示启用的开关，为true时仅返回enabled=true的开关\n@example false\n@default false",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
+        "tags": [
+          "FeatureToggle"
+        ]
+      }
+    },
+    "/api/v1/features/stats": {
+      "get": {
+        "summary": "获取功能开关统计",
+        "operationId": "FeatureToggle_GetStats",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1GetStatsReply"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "FeatureToggle"
+        ]
+      }
+    },
+    "/api/v1/features/{flag}": {
+      "get": {
+        "summary": "获取单个功能开关\n@description 根据功能标识获取具体的功能开关配置信息\n@summary 获取功能开关详情\n@tags FeatureToggle\n@produce application/json\n@param flag path string true \"功能标识符\" example(\"user_management\")\n@success 200 {object} GetToggleReply \"成功返回功能开关信息\"\n@failure 404 {object} ErrorResponse \"功能开关不存在\"\n@failure 500 {object} ErrorResponse \"内部服务器错误\"",
+        "operationId": "FeatureToggle_GetToggle",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1GetToggleReply"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "flag",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "FeatureToggle"
+        ]
+      },
+      "delete": {
+        "summary": "删除功能开关",
+        "operationId": "FeatureToggle_DeleteToggle",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1DeleteToggleReply"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "flag",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "FeatureToggle"
+        ]
+      },
+      "put": {
+        "summary": "更新功能开关",
+        "operationId": "FeatureToggle_UpdateToggle",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1UpdateToggleReply"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "flag",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/FeatureToggleUpdateToggleBody"
+            }
+          }
+        ],
+        "tags": [
+          "FeatureToggle"
+        ]
+      }
+    },
+    "/api/v1/features/{flag}/disable": {
+      "post": {
+        "summary": "禁用功能开关",
+        "operationId": "FeatureToggle_DisableToggle",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1DisableToggleReply"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "flag",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/FeatureToggleDisableToggleBody"
+            }
+          }
+        ],
+        "tags": [
+          "FeatureToggle"
+        ]
+      }
+    },
+    "/api/v1/features/{flag}/enable": {
+      "post": {
+        "summary": "启用功能开关",
+        "operationId": "FeatureToggle_EnableToggle",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1EnableToggleReply"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "flag",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/FeatureToggleEnableToggleBody"
+            }
+          }
+        ],
+        "tags": [
+          "FeatureToggle"
+        ]
+      }
+    },
+    "/api/v1/features/{flag}/evaluate": {
+      "post": {
+        "summary": "评估功能开关",
+        "operationId": "FeatureToggle_EvaluateToggle",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1EvaluateToggleReply"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "flag",
+            "description": "功能标识符\n@example \"user_management\"\n@required",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/FeatureToggleEvaluateToggleBody"
+            }
+          }
+        ],
+        "tags": [
+          "FeatureToggle"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "FeatureToggleDisableToggleBody": {
+      "type": "object"
+    },
+    "FeatureToggleEnableToggleBody": {
+      "type": "object"
+    },
+    "FeatureToggleEvaluateToggleBody": {
+      "type": "object",
+      "properties": {
+        "context": {
+          "$ref": "#/definitions/v1EvaluationContext",
+          "title": "评估上下文，包含用户信息、环境信息等\n@required"
+        }
+      },
+      "title": "评估功能开关请求\n@description 根据上下文信息评估功能开关是否应该启用"
+    },
+    "FeatureToggleUpdateToggleBody": {
+      "type": "object",
+      "properties": {
+        "config": {
+          "$ref": "#/definitions/v1ToggleConfig"
+        }
+      }
+    },
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": {}
+    },
+    "rpcStatus": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/protobufAny"
+          }
+        }
+      }
+    },
+    "v1DeleteToggleReply": {
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean"
+        }
+      }
+    },
+    "v1DisableToggleReply": {
+      "type": "object",
+      "properties": {
+        "toggle": {
+          "$ref": "#/definitions/v1FeatureToggleInfo"
+        }
+      }
+    },
+    "v1EnableToggleReply": {
+      "type": "object",
+      "properties": {
+        "toggle": {
+          "$ref": "#/definitions/v1FeatureToggleInfo"
+        }
+      }
+    },
+    "v1EvaluateToggleReply": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "title": "是否启用该功能\n@example true"
+        },
+        "reason": {
+          "type": "string",
+          "title": "评估原因说明，解释为什么返回这个结果\n可能的值包括：\n- \"feature_disabled\": 功能全局禁用\n- \"user_not_allowed\": 用户不在允许列表中\n- \"environment_mismatch\": 环境不匹配\n- \"percentage_not_hit\": 百分比未命中\n- \"simple_enabled\": 简单策略启用\n@example \"simple_enabled\""
+        }
+      },
+      "title": "评估功能开关响应\n@description 功能开关评估结果，包含是否启用和原因说明"
+    },
+    "v1EvaluationContext": {
+      "type": "object",
+      "properties": {
+        "user_id": {
+          "type": "string"
+        },
+        "user_type": {
+          "type": "string"
+        },
+        "environment": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "attributes": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "title": "评估上下文"
+    },
+    "v1FeatureStrategy": {
+      "type": "string",
+      "enum": [
+        "SIMPLE",
+        "PERCENTAGE",
+        "USER",
+        "TIME",
+        "ENVIRONMENT"
+      ],
+      "default": "SIMPLE",
+      "description": "- SIMPLE: 简单策略 - 仅根据enabled字段决定是否启用\n - PERCENTAGE: 百分比策略 - 根据设定的百分比随机启用功能\n - USER: 用户策略 - 根据用户类型或ID决定是否启用\n - TIME: 时间策略 - 根据时间范围决定是否启用\n - ENVIRONMENT: 环境策略 - 根据部署环境决定是否启用",
+      "title": "功能开关策略类型\n@description 定义不同的功能开关策略，用于控制功能的启用逻辑"
+    },
+    "v1FeatureToggleInfo": {
+      "type": "object",
+      "properties": {
+        "flag": {
+          "type": "string"
+        },
+        "config": {
+          "$ref": "#/definitions/v1ToggleConfig"
+        }
+      },
+      "title": "功能开关信息"
+    },
+    "v1GetStatsReply": {
+      "type": "object",
+      "properties": {
+        "total_toggles": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "enabled_count": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "disabled_count": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "strategies": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      }
+    },
+    "v1GetToggleReply": {
+      "type": "object",
+      "properties": {
+        "toggle": {
+          "$ref": "#/definitions/v1FeatureToggleInfo"
+        }
+      }
+    },
+    "v1ListTogglesReply": {
+      "type": "object",
+      "properties": {
+        "toggles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1FeatureToggleInfo"
+          }
+        },
+        "total": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "page": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "page_size": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "v1ToggleConfig": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "strategy": {
+          "$ref": "#/definitions/v1FeatureStrategy"
+        },
+        "rules": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "description": {
+          "type": "string"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "title": "功能开关配置"
+    },
+    "v1UpdateToggleReply": {
+      "type": "object",
+      "properties": {
+        "toggle": {
+          "$ref": "#/definitions/v1FeatureToggleInfo"
+        }
+      }
+    }
+  }
+}

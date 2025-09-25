@@ -1,9 +1,9 @@
-# Sensitive Data Handling
+# 敏感数据处理
 
 <cite>
-**Referenced Files in This Document**   
-- [anonymizer.go](file://internal/pkg/sensitive/anonymizer.go)
-- [rules.go](file://internal/pkg/sensitive/rules.go)
+**本文档引用的文件**   
+- [anonymizer.go](file://internal/pkg/sensitive/anonymizer.go) - *在最近提交中更新*
+- [rules.go](file://internal/pkg/sensitive/rules.go) - *在最近提交中更新*
 - [middleware.go](file://internal/pkg/sensitive/middleware.go)
 - [structured_logger.go](file://internal/pkg/sensitive/structured_logger.go)
 - [interfaces.go](file://internal/pkg/sensitive/interfaces.go)
@@ -11,64 +11,74 @@
 - [features.yaml](file://configs/features.yaml)
 </cite>
 
-## Table of Contents
-1. [Introduction](#introduction)
-2. [Core Components and Architecture](#core-components-and-architecture)
-3. [Sensitive Data Detection Mechanism](#sensitive-data-detection-mechanism)
-4. [Anonymization Rules and Strategies](#anonymization-rules-and-strategies)
-5. [Middleware Integration for Secure Logging](#middleware-integration-for-secure-logging)
-6. [Structured Logger Implementation](#structured-logger-implementation)
-7. [Configuration and Feature Management](#configuration-and-feature-management)
-8. [Performance Considerations](#performance-considerations)
-9. [Extending Detection Rules](#extending-detection-rules)
-10. [Conclusion](#conclusion)
+## 更新摘要
+**已做更改**   
+- 根据最新代码实现更新了敏感数据检测机制和脱敏规则部分
+- 增强了匿名化策略的技术细节描述
+- 更新了核心组件架构图以反映实际代码结构
+- 添加了对新支持的敏感数据类型（姓名、地址）的说明
+- 修正了配置管理部分以匹配当前实现
 
-## Introduction
-The Sensitive Data Handling system in kratos-boilerplate provides comprehensive protection for Personally Identifiable Information (PII), credentials, and other sensitive data throughout the application lifecycle. This document details the automatic detection, anonymization, and secure logging mechanisms that ensure compliance with data privacy regulations while maintaining debuggability. The system employs pattern matching, regular expressions, and configurable rules to identify and redact sensitive information in real-time across requests, responses, logs, and structured data.
+## 目录
+1. [简介](#简介)
+2. [核心组件与架构](#核心组件与架构)
+3. [敏感数据检测机制](#敏感数据检测机制)
+4. [匿名化规则与策略](#匿名化规则与策略)
+5. [安全日志中间件集成](#安全日志中间件集成)
+6. [结构化日志器实现](#结构化日志器实现)
+7. [配置与功能管理](#配置与功能管理)
+8. [性能考量](#性能考量)
+9. [扩展检测规则](#扩展检测规则)
+10. [结论](#结论)
 
-## Core Components and Architecture
-The sensitive data handling system is composed of several interconnected components that work together to detect, anonymize, and log sensitive information securely. The architecture follows a layered approach with clear separation of concerns between detection, anonymization, and logging responsibilities.
+## 简介
+kratos-boilerplate中的敏感数据处理系统为个人身份信息(PII)、凭证和其他敏感数据在整个应用生命周期中提供全面保护。本文档详细介绍了自动检测、匿名化和安全日志记录机制，确保符合数据隐私法规的同时保持可调试性。该系统采用模式匹配、正则表达式和可配置规则，在请求、响应、日志和结构化数据中实时识别和清除敏感信息。
+
+## 核心组件与架构
+敏感数据处理系统由多个相互连接的组件组成，共同协作以安全地检测、匿名化和记录敏感信息。架构遵循分层方法，在检测、匿名化和日志记录责任之间有明确的关注点分离。
 
 ```mermaid
 graph TD
-A["Sensitive Data Handling System"] --> B[SensitiveDetector]
+A["敏感数据处理系统"] --> B[SensitiveDetector]
 A --> C[Anonymizer]
 A --> D[LogSanitizer]
 A --> E[StructuredLogger]
 A --> F[LogSanitizeMiddleware]
-B --> |Detects| G["PII: Email, Phone, ID, etc."]
-C --> |Applies| H["Anonymization Rules"]
-D --> |Sanitizes| I["Log Content"]
-E --> |Provides| J["Structured Logging"]
-F --> |Integrates| K["Kratos Middleware Chain"]
-F --> |Uses| B
-F --> |Uses| D
-E --> |Uses| C
-E --> |Uses| B
+B --> |检测| G["PII: 邮箱、电话、身份证等"]
+C --> |应用| H["匿名化规则"]
+D --> |清理| I["日志内容"]
+E --> |提供| J["结构化日志"]
+F --> |集成| K["Kratos中间件链"]
+F --> |使用| B
+F --> |使用| D
+E --> |使用| C
+E --> |使用| B
 ```
 
-**Diagram sources**
+**图表来源**
 - [anonymizer.go](file://internal/pkg/sensitive/anonymizer.go#L15-L30)
 - [middleware.go](file://internal/pkg/sensitive/middleware.go#L25-L40)
 - [structured_logger.go](file://internal/pkg/sensitive/structured_logger.go#L15-L30)
 
-**Section sources**
+**本节来源**
 - [anonymizer.go](file://internal/pkg/sensitive/anonymizer.go#L1-L50)
 - [middleware.go](file://internal/pkg/sensitive/middleware.go#L1-L50)
 - [structured_logger.go](file://internal/pkg/sensitive/structured_logger.go#L1-L50)
 
-## Sensitive Data Detection Mechanism
-The system implements a robust detection mechanism that automatically identifies various types of sensitive information using regular expressions and pattern matching. The `SensitiveDetector` interface defines the contract for detection capabilities, with the concrete `sensitiveDetector` implementation providing specific pattern recognition for different data types.
+## 敏感数据检测机制
+系统实现了强大的检测机制，使用正则表达式和模式匹配自动识别各种类型的敏感信息。`SensitiveDetector`接口定义了检测能力的契约，具体实现`sensitiveDetector`提供了针对不同类型数据的特定模式识别。
 
-### Detection Capabilities
-The detector can identify the following sensitive information types:
-- Email addresses
-- Mobile phone numbers
-- Identity card numbers
-- Bank card numbers
+### 检测能力
+检测器可以识别以下类型的敏感信息：
+- 电子邮件地址
+- 手机号码
+- 身份证号码
+- 银行卡号码
+- 姓名
+- 地址
 
-### Detection Implementation
-The detection logic is implemented in the `sensitiveDetector` struct, which uses compiled regular expressions to efficiently scan text content:
+### 检测实现
+检测逻辑在`sensitiveDetector`结构体中实现，使用编译后的正则表达式高效扫描文本内容：
 
 ```go
 type sensitiveDetector struct {
@@ -79,116 +89,146 @@ type sensitiveDetector struct {
 }
 ```
 
-Each regular expression is optimized for its specific data type:
-- Email: `[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}`
-- Phone: `1[3-9]\d{9}` (Chinese mobile numbers)
-- ID Card: `[1-9]\d{5}(18|19|20)\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\d{3}[\dXx]`
-- Bank Card: `[1-9]\d{11,19}`
+每个正则表达式都针对其特定数据类型进行了优化：
+- 邮箱：`[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}`
+- 手机：`1[3-9]\d{9}` (中国手机号码)
+- 身份证：`[1-9]\d{5}(18|19|20)\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\d{3}[\dXx]`
+- 银行卡：`[1-9]\d{11,19}`
 
-The `DetectAll` method scans input text and returns a map of detected sensitive information by type:
+`DetectAll`方法扫描输入文本并按类型返回检测到的敏感信息映射：
 
 ```mermaid
 flowchart TD
-Start([Input Text]) --> DetectEmail["Detect Email Addresses"]
-DetectEmail --> DetectPhone["Detect Phone Numbers"]
-DetectPhone --> DetectIDCard["Detect ID Cards"]
-DetectIDCard --> DetectBankCard["Detect Bank Cards"]
-DetectBankCard --> CollectResults["Collect Results by Type"]
-CollectResults --> ReturnMap["Return map[string][]string"]
+Start([输入文本]) --> DetectEmail["检测邮箱地址"]
+DetectEmail --> DetectPhone["检测手机号码"]
+DetectPhone --> DetectIDCard["检测身份证"]
+DetectIDCard --> DetectBankCard["检测银行卡"]
+DetectBankCard --> CollectResults["按类型收集结果"]
+CollectResults --> ReturnMap["返回 map[string][]string"]
 ```
 
-**Diagram sources**
+**图表来源**
 - [anonymizer.go](file://internal/pkg/sensitive/anonymizer.go#L350-L380)
 - [interfaces.go](file://internal/pkg/sensitive/interfaces.go#L45-L55)
 
-**Section sources**
+**本节来源**
 - [anonymizer.go](file://internal/pkg/sensitive/anonymizer.go#L350-L380)
 - [interfaces.go](file://internal/pkg/sensitive/interfaces.go#L45-L55)
 
-## Anonymization Rules and Strategies
-The system provides flexible anonymization rules that define how sensitive data should be masked or redacted. These rules support both standard patterns and custom functions for specialized anonymization requirements.
+## 匿名化规则与策略
+系统提供灵活的匿名化规则，定义如何屏蔽或清除敏感数据。这些规则支持标准模式和自定义函数，以满足特殊的匿名化需求。
 
-### Default Anonymization Rules
-The system includes predefined rules for common sensitive data types:
+### 默认匿名化规则
+系统包含常见敏感数据类型的预定义规则：
 
 ```go
-// EmailRule: preserves username prefix and domain
+// EmailRule: 保留用户名前缀和域名
 CustomFunc: func(email string) string {
+    if !isValidEmail(email) {
+        return email
+    }
     parts := strings.Split(email, "@")
+    if len(parts) != 2 {
+        return email
+    }
     username := parts[0]
-    return username[:2] + strings.Repeat("*", len(username)-2) + "@" + parts[1]
+    domain := parts[1]
+    
+    if len(username) <= 2 {
+        return email
+    }
+    
+    maskedUsername := username[:2] + strings.Repeat("*", len(username)-2)
+    return maskedUsername + "@" + domain
 }
 
-// PhoneRule: masks middle digits (138****8000)
+// PhoneRule: 掩盖中间数字 (138****8000)
 CustomFunc: func(phone string) string {
-    return phone[:3] + "****" + phone[7:]
+    if !isValidPhone(phone) {
+        return phone
+    }
+    // 中国手机号格式：138****8000
+    if len(phone) == 11 {
+        return phone[:3] + "****" + phone[7:]
+    }
+    // 其他格式使用通用规则
+    rule := AnonymizeRule{KeepStart: 3, KeepEnd: 4, MaskChar: "*"}
+    return anonymizeWithRule(phone, rule)
 }
 
-// IDCardRule: masks middle 8 digits (110101********1234)
+// IDCardRule: 掩盖中间8位数字 (110101********1234)
 CustomFunc: func(idCard string) string {
-    return idCard[:6] + "********" + idCard[14:]
+    if !isValidIDCard(idCard) {
+        return idCard
+    }
+    // 身份证号格式：110101********1234
+    if len(idCard) == 18 {
+        return idCard[:6] + "********" + idCard[14:]
+    }
+    rule := AnonymizeRule{KeepStart: 6, KeepEnd: 4, MaskChar: "*"}
+    return anonymizeWithRule(idCard, rule)
 }
 ```
 
-### Rule Structure
-The `AnonymizeRule` struct defines the configuration for each anonymization rule:
+### 规则结构
+`AnonymizeRule`结构体定义了每个匿名化规则的配置：
 
 ```go
 type AnonymizeRule struct {
-    FieldName  string              // Field name identifier
-    KeepStart  int                 // Number of leading characters to preserve
-    KeepEnd    int                 // Number of trailing characters to preserve
-    MaskChar   string              // Masking character (default: *)
-    CustomFunc func(string) string // Custom anonymization function
+    FieldName  string              // 字段名称标识符
+    KeepStart  int                 // 保留开头字符数
+    KeepEnd    int                 // 保留结尾字符数
+    MaskChar   string              // 掩码字符（默认：*）
+    CustomFunc func(string) string // 自定义匿名化函数
 }
 ```
 
-### Anonymization Process
-The anonymization process follows a priority order:
-1. If a `CustomFunc` is defined, it takes precedence
-2. Otherwise, the generic `anonymizeWithRule` function is used
-3. The function preserves `KeepStart` and `KeepEnd` characters, replacing the middle portion with `MaskChar`
+### 匿名化过程
+匿名化过程遵循优先级顺序：
+1. 如果定义了`CustomFunc`，它具有最高优先级
+2. 否则，使用通用的`anonymizeWithRule`函数
+3. 函数保留`KeepStart`和`KeepEnd`个字符，用`MaskChar`替换中间部分
 
 ```mermaid
 flowchart TD
-Input[Input Value] --> HasCustom["Has Custom Function?"]
-HasCustom --> |Yes| ApplyCustom["Apply Custom Function"]
-HasCustom --> |No| CheckLength["Length > KeepStart+KeepEnd?"]
-CheckLength --> |No| ReturnOriginal["Return Original Value"]
-CheckLength --> |Yes| ExtractParts["Extract Start, End, Middle"]
-ExtractParts --> CreateMask["Create Mask String"]
-CreateMask --> Combine["Combine: Start + Mask + End"]
-Combine --> Output[Anonymized Value]
+Input[输入值] --> HasCustom["是否有自定义函数？"]
+HasCustom --> |是| ApplyCustom["应用自定义函数"]
+HasCustom --> |否| CheckLength["长度 > KeepStart+KeepEnd？"]
+CheckLength --> |否| ReturnOriginal["返回原始值"]
+CheckLength --> |是| ExtractParts["提取开始、结束、中间部分"]
+ExtractParts --> CreateMask["创建掩码字符串"]
+CreateMask --> Combine["组合: 开始 + 掩码 + 结束"]
+Combine --> Output[匿名化值]
 ```
 
-**Diagram sources**
+**图表来源**
 - [rules.go](file://internal/pkg/sensitive/rules.go#L15-L100)
 - [anonymizer.go](file://internal/pkg/sensitive/anonymizer.go#L300-L320)
 
-**Section sources**
+**本节来源**
 - [rules.go](file://internal/pkg/sensitive/rules.go#L15-L224)
 - [anonymizer.go](file://internal/pkg/sensitive/anonymizer.go#L300-L320)
 
-## Middleware Integration for Secure Logging
-The system integrates with the Kratos framework through a middleware component that automatically sanitizes request and response data before logging. This ensures that sensitive information is never written to log files in plaintext.
+## 安全日志中间件集成
+系统通过中间件组件与Kratos框架集成，该组件在日志记录前自动清理请求和响应数据。这确保了敏感信息永远不会以明文形式写入日志文件。
 
-### LogSanitizeMiddleware Configuration
-The middleware is configured through the `LogSanitizeConfig` struct, which provides granular control over sanitization behavior:
+### LogSanitizeMiddleware 配置
+中间件通过`LogSanitizeConfig`结构体进行配置，提供对清理行为的细粒度控制：
 
 ```go
 type LogSanitizeConfig struct {
-    Enabled          bool                     // Enable/disable sanitization
-    SanitizeRequest  bool                     // Sanitize request data
-    SanitizeResponse bool                     // Sanitize response data
-    SanitizeHeaders  bool                     // Sanitize request headers
-    CustomRules      map[string]AnonymizeRule // Custom anonymization rules
-    ExcludePaths     []string                 // Paths to exclude from sanitization
-    MaxLogLength     int                      // Maximum log entry length
+    Enabled          bool                     // 启用/禁用清理
+    SanitizeRequest  bool                     // 清理请求数据
+    SanitizeResponse bool                     // 清理响应数据
+    SanitizeHeaders  bool                     // 清理请求头
+    CustomRules      map[string]AnonymizeRule // 自定义匿名化规则
+    ExcludePaths     []string                 // 从清理中排除的路径
+    MaxLogLength     int                      // 最大日志条目长度
 }
 ```
 
-### Request Processing Flow
-The middleware intercepts requests and responses in the following sequence:
+### 请求处理流程
+中间件按以下顺序拦截请求和响应：
 
 ```mermaid
 sequenceDiagram
@@ -196,19 +236,19 @@ participant Client
 participant Middleware
 participant Handler
 participant Logger
-Client->>Middleware : Request
-Middleware->>Middleware : Check if enabled
-Middleware->>Middleware : Check exclude paths
-Middleware->>Middleware : Log sanitized request
-Middleware->>Handler : Forward request
-Handler->>Middleware : Response/Error
-Middleware->>Middleware : Log sanitized response
-Middleware->>Logger : Write sanitized logs
-Middleware->>Client : Response
+Client->>Middleware : 请求
+Middleware->>Middleware : 检查是否启用
+Middleware->>Middleware : 检查排除路径
+Middleware->>Middleware : 记录清理后的请求
+Middleware->>Handler : 转发请求
+Handler->>Middleware : 响应/错误
+Middleware->>Middleware : 记录清理后的响应
+Middleware->>Logger : 写入清理后的日志
+Middleware->>Client : 响应
 ```
 
-### Header Sanitization
-Sensitive HTTP headers are specifically targeted for redaction:
+### 头部清理
+特别针对敏感HTTP头部进行清除：
 
 ```go
 func (m *LogSanitizeMiddleware) isSensitiveHeader(headerName string) bool {
@@ -222,7 +262,7 @@ func (m *LogSanitizeMiddleware) isSensitiveHeader(headerName string) bool {
         "secret",
         "token",
     }
-    // Case-insensitive partial match
+    // 不区分大小写的部分匹配
     headerLower := strings.ToLower(headerName)
     for _, sensitive := range sensitiveHeaders {
         if strings.Contains(headerLower, sensitive) {
@@ -233,43 +273,43 @@ func (m *LogSanitizeMiddleware) isSensitiveHeader(headerName string) bool {
 }
 ```
 
-When sensitive headers are detected, their values are replaced with "[REDACTED]" in the logs.
+当检测到敏感头部时，其值在日志中被替换为"[REDACTED]"。
 
-**Diagram sources**
+**图表来源**
 - [middleware.go](file://internal/pkg/sensitive/middleware.go#L50-L100)
 - [middleware.go](file://internal/pkg/sensitive/middleware.go#L150-L200)
 
-**Section sources**
+**本节来源**
 - [middleware.go](file://internal/pkg/sensitive/middleware.go#L50-L327)
 
-## Structured Logger Implementation
-The `StructuredLogger` provides a comprehensive solution for secure structured logging with automatic detection and anonymization of sensitive data.
+## 结构化日志器实现
+`StructuredLogger`为安全的结构化日志记录提供了综合解决方案，具有自动检测和匿名化敏感数据的功能。
 
-### Configuration Options
-The structured logger is highly configurable through the `StructuredLogConfig`:
+### 配置选项
+结构化日志器通过`StructuredLogConfig`高度可配置：
 
 ```go
 type StructuredLogConfig struct {
-    Enabled           bool                     // Enable/disable logger
-    AutoDetect        bool                     // Enable auto-detection
-    CustomRules       map[string]AnonymizeRule // Custom rules
-    SensitiveKeys     []string                 // Sensitive field names
-    MaxValueLength    int                      // Maximum value length
-    TruncateThreshold int                      // Threshold for truncation
+    Enabled           bool                     // 启用/禁用日志器
+    AutoDetect        bool                     // 启用自动检测
+    CustomRules       map[string]AnonymizeRule // 自定义规则
+    SensitiveKeys     []string                 // 敏感字段名称
+    MaxValueLength    int                      // 最大值长度
+    TruncateThreshold int                      // 截断阈值
 }
 ```
 
-### Key Features
-The structured logger provides several important features:
+### 关键特性
+结构化日志器提供几个重要特性：
 
-#### Automatic Field Detection
-The logger automatically identifies sensitive fields based on:
-- Field names containing sensitive keywords (password, token, secret, etc.)
-- Fields matching predefined sensitive key patterns
-- Fields with specific anonymization rules
+#### 自动字段检测
+日志器基于以下条件自动识别敏感字段：
+- 字段名包含敏感关键词（password, token, secret等）
+- 字段匹配预定义的敏感键模式
+- 字段具有特定的匿名化规则
 
-#### Value Truncation
-To prevent excessively large log entries, the logger can truncate values:
+#### 值截断
+为防止过大的日志条目，日志器可以截断值：
 
 ```go
 func (s *StructuredLogger) truncateIfNeeded(value interface{}) interface{} {
@@ -284,11 +324,11 @@ func (s *StructuredLogger) truncateIfNeeded(value interface{}) interface{} {
 }
 ```
 
-#### Context Preservation
-The logger maintains compatibility with existing Kratos logging patterns while adding sanitization:
+#### 上下文保留
+日志器在添加清理功能的同时保持与现有Kratos日志模式的兼容性：
 
 ```go
-// Standard structured logging methods with sanitization
+// 带清理的标准结构化日志方法
 func (s *StructuredLogger) Infow(msg string, keysAndValues ...interface{})
 func (s *StructuredLogger) Debugw(msg string, keysAndValues ...interface{})
 func (s *StructuredLogger) Errorw(msg string, keysAndValues ...interface{})
@@ -296,39 +336,39 @@ func (s *StructuredLogger) Errorw(msg string, keysAndValues ...interface{})
 
 ```mermaid
 flowchart TD
-Input[Infow/Debugw/etc.] --> CheckEnabled["Sanitization Enabled?"]
-CheckEnabled --> |No| DirectLog["Log Directly"]
-CheckEnabled --> |Yes| ProcessPairs["Process Key-Value Pairs"]
-ProcessPairs --> Loop["For each key-value pair"]
-Loop --> IsSensitiveKey["Is Sensitive Key?"]
-IsSensitiveKey --> |Yes| SanitizeValue["Sanitize Value"]
-IsSensitiveKey --> |No| AutoDetect["Auto-Detect Sensitive Content"]
-AutoDetect --> |Found| SanitizeContent["Sanitize Content"]
-AutoDetect --> |Not Found| KeepValue["Keep Value"]
-SanitizeValue --> CheckLength["Check Length"]
+Input[Infow/Debugw/etc.] --> CheckEnabled["清理已启用？"]
+CheckEnabled --> |否| DirectLog["直接日志"]
+CheckEnabled --> |是| ProcessPairs["处理键值对"]
+ProcessPairs --> Loop["对每个键值对"]
+Loop --> IsSensitiveKey["是敏感键？"]
+IsSensitiveKey --> |是| SanitizeValue["清理值"]
+IsSensitiveKey --> |否| AutoDetect["自动检测敏感内容"]
+AutoDetect --> |发现| SanitizeContent["清理内容"]
+AutoDetect --> |未发现| KeepValue["保留值"]
+SanitizeValue --> CheckLength["检查长度"]
 SanitizeContent --> CheckLength
 KeepValue --> CheckLength
-CheckLength --> Truncate["Truncate if Necessary"]
-Truncate --> AddToLog["Add to Log Entry"]
-AddToLog --> NextPair["Next Pair"]
+CheckLength --> Truncate["必要时截断"]
+Truncate --> AddToLog["添加到日志条目"]
+AddToLog --> NextPair["下一个对"]
 NextPair --> Loop
-Loop --> |All Pairs Processed| WriteLog["Write Sanitized Log"]
+Loop --> |所有对已处理| WriteLog["写入清理后的日志"]
 ```
 
-**Diagram sources**
+**图表来源**
 - [structured_logger.go](file://internal/pkg/sensitive/structured_logger.go#L15-L100)
 - [structured_logger.go](file://internal/pkg/sensitive/structured_logger.go#L200-L250)
 
-**Section sources**
+**本节来源**
 - [structured_logger.go](file://internal/pkg/sensitive/structured_logger.go#L1-L388)
 
-## Configuration and Feature Management
-The sensitive data handling system is controlled through configuration files and feature flags, allowing for flexible deployment across different environments.
+## 配置与功能管理
+敏感数据处理系统通过配置文件和功能标志进行控制，允许在不同环境中灵活部署。
 
-### Configuration Files
-The system uses YAML configuration files to manage settings:
+### 配置文件
+系统使用YAML配置文件管理设置：
 
-**config.yaml** enables the plugin system and features framework:
+**config.yaml** 启用插件系统和功能框架：
 ```yaml
 plugins:
   enabled: true
@@ -342,18 +382,18 @@ features:
   config_format: "yaml"
 ```
 
-**features.yaml** contains the sensitive data feature flag:
+**features.yaml** 包含敏感数据功能标志：
 ```yaml
 sensitive_data:
   enabled: true
   strategy: simple
   rules: {}
-  description: "Sensitive data processing switch"
+  description: "敏感数据处理开关"
   tags: ["data", "security", "privacy"]
 ```
 
-### Default Configuration
-Both the middleware and structured logger provide sensible defaults:
+### 默认配置
+中间件和结构化日志器都提供合理的默认值：
 
 ```go
 func DefaultLogSanitizeConfig() *LogSanitizeConfig {
@@ -380,59 +420,59 @@ func DefaultStructuredLogConfig() *StructuredLogConfig {
 }
 ```
 
-These defaults ensure that sensitive data protection is enabled by default while allowing for customization as needed.
+这些默认值确保敏感数据保护默认启用，同时允许根据需要进行自定义。
 
-**Section sources**
+**本节来源**
 - [config.yaml](file://configs/config.yaml#L25-L35)
 - [features.yaml](file://configs/features.yaml#L135-L145)
 - [middleware.go](file://internal/pkg/sensitive/middleware.go#L45-L65)
 - [structured_logger.go](file://internal/pkg/sensitive/structured_logger.go#L45-L65)
 
-## Performance Considerations
-The sensitive data handling system is designed to minimize performance impact while providing comprehensive protection.
+## 性能考量
+敏感数据处理系统设计为最小化性能影响，同时提供全面保护。
 
-### Detection Efficiency
-The detection system uses compiled regular expressions for optimal performance:
-- Regular expressions are compiled once during initialization
-- Pattern matching is performed in a single pass
-- Multiple patterns are checked concurrently
+### 检测效率
+检测系统使用编译后的正则表达式实现最佳性能：
+- 正则表达式在初始化期间编译一次
+- 模式匹配单次通过完成
+- 多个模式并发检查
 
-### Memory Management
-The system employs several strategies to reduce memory overhead:
-- Reuses regular expression matchers
-- Processes data in chunks when possible
-- Avoids unnecessary string allocations
+### 内存管理
+系统采用多种策略减少内存开销：
+- 重用正则表达式匹配器
+- 在可能的情况下分块处理数据
+- 避免不必要的字符串分配
 
-### Performance Trade-offs
-The system balances security and performance through configurable options:
-- **Exclude Paths**: Critical endpoints like /health and /metrics are excluded by default
-- **Selective Sanitization**: Individual components (request, response, headers) can be enabled/disabled
-- **Length Limits**: Maximum log length prevents denial-of-service via large payloads
+### 性能权衡
+系统通过可配置选项平衡安全性和性能：
+- **排除路径**：像/health和/metrics这样的关键端点默认排除
+- **选择性清理**：可以单独启用/禁用各个组件（请求、响应、头部）
+- **长度限制**：最大日志长度防止通过大负载导致拒绝服务
 
-### Benchmarking
-The implementation includes comprehensive tests to ensure performance remains acceptable:
+### 基准测试
+实现包括全面测试以确保性能保持可接受：
 
 ```go
 func TestSensitiveDetector_DetectAll_Performance(t *testing.T) {
     detector := NewSensitiveDetector()
-    text := generateLargeText() // Large text for performance testing
+    text := generateLargeText() // 用于性能测试的大文本
     
     start := time.Now()
     result := detector.DetectAll(text)
     duration := time.Since(start)
     
-    assert.Less(t, duration.Milliseconds(), int64(100)) // Should complete in <100ms
+    assert.Less(t, duration.Milliseconds(), int64(100)) // 应在<100ms内完成
     assert.NotNil(t, result)
 }
 ```
 
-These benchmarks ensure that the detection and anonymization processes do not introduce unacceptable latency to request processing.
+这些基准测试确保检测和匿名化过程不会给请求处理引入不可接受的延迟。
 
-## Extending Detection Rules
-The system provides multiple mechanisms for extending detection rules to handle custom sensitive data types.
+## 扩展检测规则
+系统提供多种机制来扩展检测规则，以处理自定义的敏感数据类型。
 
-### Custom Rule Creation
-New rules can be created using the `CreateCustomRule` function:
+### 自定义规则创建
+可以使用`CreateCustomRule`函数创建新规则：
 
 ```go
 func CreateCustomRule(
@@ -443,7 +483,7 @@ func CreateCustomRule(
 ) AnonymizeRule
 ```
 
-Example: Creating a rule for medical record numbers
+示例：创建医疗记录号规则
 ```go
 medicalRecordRule := CreateCustomRule(
     "medical_record",
@@ -457,13 +497,13 @@ medicalRecordRule := CreateCustomRule(
 )
 ```
 
-### Rule Merging
-Custom rules can be merged with default rules:
+### 规则合并
+自定义规则可以与默认规则合并：
 
 ```go
 func MergeRules(rules ...map[string]AnonymizeRule) map[string]AnonymizeRule
 
-// Usage example
+// 使用示例
 customRules := map[string]AnonymizeRule{
     "medical_record": medicalRecordRule,
     "employee_id": employeeIdRule,
@@ -472,50 +512,50 @@ customRules := map[string]AnonymizeRule{
 allRules := MergeRules(GetDefaultRules(), customRules)
 ```
 
-### Integration Methods
-Custom rules can be integrated through multiple approaches:
+### 集成方法
+可以通过多种方式集成自定义规则：
 
-#### 1. Middleware Configuration
+#### 1. 中间件配置
 ```go
 config := &LogSanitizeConfig{
     CustomRules: customRules,
-    // other settings...
+    // 其他设置...
 }
 middleware := NewLogSanitizeMiddleware(config, logger)
 ```
 
-#### 2. Structured Logger Configuration
+#### 2. 结构化日志器配置
 ```go
 config := &StructuredLogConfig{
     CustomRules: customRules,
-    // other settings...
+    // 其他设置...
 }
 logger := NewStructuredLogger(helper, config)
 ```
 
-#### 3. Dynamic Rule Updates
+#### 3. 动态规则更新
 ```go
-// Update rules at runtime
+// 运行时更新规则
 structuredLogger.UpdateRules(newRules)
 ```
 
-#### 4. Sensitive Key Expansion
+#### 4. 敏感键扩展
 ```go
-// Add custom sensitive field names
+// 添加自定义敏感字段名
 structuredLogger.AddSensitiveKey("medical_record")
 structuredLogger.AddSensitiveKey("patient_id")
 ```
 
-This extensibility ensures that the system can adapt to organization-specific requirements for sensitive data protection.
+这种可扩展性确保系统能够适应组织特定的敏感数据保护要求。
 
-## Conclusion
-The Sensitive Data Handling system in kratos-boilerplate provides a comprehensive, flexible, and performant solution for protecting sensitive information. By combining automatic detection, configurable anonymization rules, and seamless integration with the logging infrastructure, the system ensures that PII and credentials are never exposed in logs while maintaining the debuggability needed for operational support.
+## 结论
+kratos-boilerplate中的敏感数据处理系统为保护敏感信息提供了全面、灵活且高性能的解决方案。通过结合自动检测、可配置的匿名化规则以及与日志基础设施的无缝集成，该系统确保PII和凭证永远不会暴露在日志中，同时保持操作支持所需的可调试性。
 
-Key strengths of the system include:
-- **Comprehensive Coverage**: Detection of multiple sensitive data types
-- **Flexible Configuration**: Granular control over sanitization behavior
-- **Performance Optimized**: Efficient pattern matching with minimal overhead
-- **Extensible Design**: Easy addition of custom rules and detection patterns
-- **Standards Compliant**: Helps meet regulatory requirements for data protection
+系统的关键优势包括：
+- **全面覆盖**：检测多种敏感数据类型
+- **灵活配置**：对清理行为的细粒度控制
+- **性能优化**：高效的模式匹配，开销最小
+- **可扩展设计**：轻松添加自定义规则和检测模式
+- **符合标准**：帮助满足数据保护的监管要求
 
-The system strikes an effective balance between security and usability, providing robust protection without compromising the ability to troubleshoot and monitor application behavior. By leveraging the Kratos middleware framework and structured logging patterns, it integrates seamlessly into the existing architecture while adding critical data protection capabilities.
+该系统在安全性和可用性之间取得了有效平衡，提供强大的保护，而不会损害故障排除和监控应用行为的能力。通过利用Kratos中间件框架和结构化日志模式，它无缝集成到现有架构中，同时增加了关键的数据保护功能。

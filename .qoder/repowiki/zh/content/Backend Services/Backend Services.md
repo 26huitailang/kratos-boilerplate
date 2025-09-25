@@ -31,14 +31,19 @@
 - [wire.go](file://internal/pkg/feature/wire.go)
 - [auth_bdd_test.go](file://test/bdd/auth/auth_bdd_test.go)
 - [auth_e2e_test.go](file://test/e2e/scenarios/auth_e2e_test.go)
+- [auth.go](file://internal/pkg/auth/auth.go) - *在最近提交中更新*
+- [config.go](file://internal/pkg/config/config.go) - *在最近提交中更新*
+- [errors.go](file://internal/pkg/errors/errors.go) - *在最近提交中更新*
+- [database.go](file://internal/pkg/db/database.go) - *在最近提交中更新*
+- [cache.go](file://internal/pkg/cache/cache.go) - *在最近提交中更新*
 </cite>
 
 ## 更新摘要
 **已做更改**   
-- 新增了功能开关服务章节，详细说明分层功能开关系统的实现
-- 在服务关系和共享组件部分增加了功能开关系统的依赖关系
+- 新增了基础模块章节，详细说明Kratos基础模块的设计与实现
+- 在服务关系和共享组件部分增加了基础模块的依赖关系
 - 更新了文档引用文件列表，包含新功能相关的源文件
-- 在共享组件部分增加了功能开关配置管理内容
+- 在共享组件部分增加了配置管理、错误处理、数据库和缓存等基础组件内容
 
 ## 目录
 1. [简介](#简介)
@@ -47,9 +52,10 @@
 4. [操作日志](#操作日志)
 5. [敏感数据处理](#敏感数据处理)
 6. [功能开关服务](#功能开关服务)
-7. [服务关系和共享组件](#服务关系和共享组件)
-8. [错误管理与常见问题](#错误管理与常见问题)
-9. [结论](#结论)
+7. [基础模块](#基础模块)
+8. [服务关系和共享组件](#服务关系和共享组件)
+9. [错误管理与常见问题](#错误管理与常见问题)
+10. [结论](#结论)
 
 ## 简介
 kratos-boilerplate 项目实现了一个具有强大安全性和操作功能的综合后端系统。本文档提供了核心后端服务的详细分析，重点关注认证服务、验证码服务、操作日志和敏感数据处理。该系统遵循清晰架构模式，在服务、业务逻辑（biz）和数据（持久化）层之间有明确的分离。认证通过JWT令牌实现，包含刷新令牌轮换和账户锁定机制。验证码功能提供针对自动化攻击的保护。全面的操作日志记录系统活动以供审计和监控。敏感数据处理通过加密和数据匿名化技术确保隐私和安全。
@@ -871,6 +877,216 @@ func (s *FeatureToggleService) ListToggles(ctx context.Context, req *v1.ListTogg
 **本节来源**
 - [feature.go](file://internal/service/feature.go#L30-L100)
 
+## 基础模块
+
+Kratos基础模块为整个系统提供了核心基础设施支持，包括认证、配置、错误处理、数据库和缓存等关键组件。
+
+### 认证管理器
+系统实现了企业级认证管理器，支持多种认证策略和令牌管理：
+
+```go
+// DefaultAuthManager 默认认证管理器
+type DefaultAuthManager struct {
+	config       *AuthConfig
+	strategies   map[string]AuthStrategy
+	tokenManager TokenManager
+	logger       *log.Helper
+}
+
+// NewAuthManager 创建认证管理器
+func NewAuthManager(config *AuthConfig, logger log.Logger) AuthManager {
+	helper := log.NewHelper(log.With(logger, "module", "auth"))
+	tokenManager := NewJWTTokenManager(&config.JWT, helper)
+	
+	return &DefaultAuthManager{
+		config:       config,
+		strategies:   make(map[string]AuthStrategy),
+		tokenManager: tokenManager,
+		logger:       helper,
+	}
+}
+```
+
+**本节来源**
+- [auth.go](file://internal/pkg/auth/auth.go#L100-L150)
+
+### 配置管理
+系统提供了完整的配置管理解决方案，支持文件和环境变量配置源：
+
+```go
+// Manager 配置管理器实现
+type Manager struct {
+	config      config.Config
+	logger      log.Logger
+	configPath  string
+	environment string
+	watchers    map[string][]config.Observer
+	mu          sync.RWMutex
+	validator   Validator
+}
+
+// Load 加载配置
+func (m *Manager) Load() error {
+	var sources []config.Source
+	
+	// 添加文件配置源
+	if m.configPath != "" {
+		sources = append(sources, file.NewSource(m.configPath))
+		
+		// 如果有环境特定配置文件，也加载它
+		if m.environment != "" {
+			envConfigPath := m.getEnvConfigPath(m.configPath, m.environment)
+			if _, err := os.Stat(envConfigPath); err == nil {
+				sources = append(sources, file.NewSource(envConfigPath))
+			}
+		}
+	}
+	
+	// 添加环境变量配置源
+	sources = append(sources, env.NewSource("KRATOS_"))
+	
+	// 创建配置
+	c := config.New(
+		config.WithSource(sources...),
+	)
+	
+	if err := c.Load(); err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+	
+	m.config = c
+	
+	// 启动配置监听（如果支持）
+	m.startWatching()
+	
+	return nil
+}
+```
+
+**本节来源**
+- [config.go](file://internal/pkg/config/config.go#L100-L150)
+
+### 错误处理
+系统实现了统一的错误处理框架，包含错误码、HTTP状态映射和错误收集器：
+
+```go
+// BaseError 基础错误结构
+type BaseError struct {
+	Code       ErrorCode              `json:"code"`
+	Message    string                 `json:"message"`
+	Details    map[string]interface{} `json:"details,omitempty"`
+	Cause      error                  `json:"-"`
+	Timestamp  time.Time              `json:"timestamp"`
+	TraceID    string                 `json:"trace_id,omitempty"`
+	Operation  string                 `json:"operation,omitempty"`
+	HTTPStatus int                    `json:"-"`
+}
+
+// ErrorCollector 错误收集器
+type ErrorCollector struct {
+	errors []*BaseError
+}
+
+// NewErrorCollector 创建错误收集器
+func NewErrorCollector() *ErrorCollector {
+	return &ErrorCollector{
+		errors: make([]*BaseError, 0),
+	}
+}
+```
+
+**本节来源**
+- [errors.go](file://internal/pkg/errors/errors.go#L100-L150)
+
+### 数据库管理
+系统提供了数据库连接池、负载均衡和健康检查功能：
+
+```go
+// database 数据库实现
+type database struct {
+	masterDB  *gorm.DB
+	slavesDB  []*gorm.DB
+	config    *Config
+	logger    log.Logger
+	balancer  *LoadBalancer
+}
+
+// NewDatabase 创建数据库实例
+func NewDatabase(config *Config, logger log.Logger) (Database, error) {
+	if config == nil {
+		config = DefaultConfig()
+	}
+	
+	db := &database{
+		config: config,
+		logger: logger,
+	}
+	
+	// 初始化主数据库
+	if err := db.initMaster(); err != nil {
+		return nil, fmt.Errorf("failed to initialize master database: %w", err)
+	}
+	
+	// 初始化从数据库
+	if err := db.initSlaves(); err != nil {
+		return nil, fmt.Errorf("failed to initialize slave databases: %w", err)
+	}
+	
+	// 初始化负载均衡器
+	db.initLoadBalancer()
+	
+	return db, nil
+}
+```
+
+**本节来源**
+- [database.go](file://internal/pkg/db/database.go#L100-L150)
+
+### 缓存管理
+系统实现了Redis缓存支持，包括分布式锁和缓存管理器：
+
+```go
+// redisCache Redis缓存实现
+type redisCache struct {
+	client redis.UniversalClient
+	config *Config
+	logger log.Logger
+}
+
+// NewCache 创建缓存实例
+func NewCache(config *Config, logger log.Logger) (Cache, error) {
+	if config == nil {
+		config = DefaultConfig()
+	}
+	
+	opts := &redis.UniversalOptions{
+		Addrs:    config.Addrs,
+		Password: config.Password,
+		DB:       config.DB,
+		PoolSize: config.PoolSize,
+	}
+	
+	client := redis.NewUniversalClient(opts)
+	
+	// 测试连接
+	ctx, cancel := context.WithTimeout(context.Background(), config.Timeout)
+	defer cancel()
+	
+	if err := client.Ping(ctx).Err(); err != nil {
+		return nil, fmt.Errorf("failed to ping redis: %w", err)
+	}
+	
+	return &redisCache{
+		client: client,
+		config: config,
+		logger: logger,
+	}, nil
+}
+```
+
+**本节来源**
+- [cache.go](file://internal/pkg/cache/cache.go#L100-L150)
+
 ## 服务关系和共享组件
 
 kratos-boilerplate中的后端服务设计有明确的依赖关系和共享组件，能够实现协同功能。
@@ -893,9 +1109,14 @@ OperationLogRepo --> Database
 FeatureToggleService --> ToggleManager
 ToggleManager --> FeatureRepository
 ToggleManager --> StrategyEvaluator
-class AuthService,AuthUsecase,CaptchaService,CaptchaRepo,OperationLogMiddleware,OperationLogRepo,FeatureToggleService,ToggleManager type_service
+AuthManager --> JWTTokenManager
+ConfigManager --> FileSource
+ConfigManager --> EnvSource
+ErrorCollector --> BaseError
+CacheManager --> RedisCache
+class AuthService,AuthUsecase,CaptchaService,CaptchaRepo,OperationLogMiddleware,OperationLogRepo,FeatureToggleService,ToggleManager,AuthManager,ConfigManager,ErrorCollector,CacheManager type_service
 class UserRepo,FeatureRepository type_repo
-class KMS,Database,Storage type_external
+class KMS,Database,Storage,FileSource,EnvSource,RedisCache type_external
 style type_service fill:#bbf,stroke:#333
 style type_repo fill:#f96,stroke:#333
 style type_external fill:#ddd,stroke:#333
@@ -909,6 +1130,11 @@ style type_external fill:#ddd,stroke:#333
 - [operation_log.go](file://internal/server/middleware/operation_log.go)
 - [feature.go](file://internal/service/feature.go)
 - [toggle_manager.go](file://internal/pkg/feature/toggle_manager.go)
+- [auth.go](file://internal/pkg/auth/auth.go)
+- [config.go](file://internal/pkg/config/config.go)
+- [errors.go](file://internal/pkg/errors/errors.go)
+- [database.go](file://internal/pkg/db/database.go)
+- [cache.go](file://internal/pkg/cache/cache.go)
 
 ### 共享组件
 多个组件在多个服务之间共享，以确保一致性：
@@ -917,34 +1143,18 @@ style type_external fill:#ddd,stroke:#333
 系统使用集中式配置方法：
 
 ```go
-// FeatureConfig 功能开关配置
-type FeatureConfig struct {
-    Enabled            bool             `json:"enabled"`
-    ConfigFile         string           `json:"config_file"`
-    ConfigFormat       string           `json:"config_format"`
-    WatchConfig        bool             `json:"watch_config"`
-    DefaultEnvironment string           `json:"default_environment"`
-    Repository         RepositoryConfig `json:"repository"`
-}
-
-// NewFeatureConfig 创建功能开关配置
-func NewFeatureConfig(c *conf.Bootstrap) *FeatureConfig {
-    if c.Features == nil {
-        // 返回默认配置
-        return &FeatureConfig{
-            Enabled:            true,
-            ConfigFile:         "./configs/features.yaml",
-            ConfigFormat:       "yaml",
-            WatchConfig:        true,
-            DefaultEnvironment: "production",
-            Repository: RepositoryConfig{
-                Type:       "file",
-                ConfigPath: "./configs/features.yaml",
-                Format:     "yaml",
-            },
-        }
-    }
-    // ... 配置处理逻辑
+// ConfigManager 配置管理器接口
+type ConfigManager interface {
+	// Load 加载配置
+	Load() error
+	// Get 获取配置值
+	Get(key string) config.Value
+	// Watch 监听配置变化
+	Watch(key string, observer config.Observer) error
+	// Close 关闭配置管理器
+	Close() error
+	// Validate 验证配置
+	Validate() error
 }
 ```
 
@@ -952,23 +1162,22 @@ func NewFeatureConfig(c *conf.Bootstrap) *FeatureConfig {
 在服务中实现了一致的错误处理策略：
 
 ```go
-// 标准错误类型
-var (
-    ErrUserNotFound        = errors.New("用户未找到")
-    ErrUserExists          = errors.New("用户已存在")
-    ErrPasswordIncorrect   = errors.New("密码不正确")
-    ErrCaptchaRequired     = errors.New("需要验证码")
-    ErrCaptchaInvalid      = errors.New("验证码无效")
-    ErrCaptchaExpired      = errors.New("验证码已过期")
-    ErrAccountLocked       = errors.New("账户已锁定")
-    ErrTokenInvalid        = errors.New("令牌无效")
-    ErrTokenExpired        = errors.New("令牌已过期")
-)
+// BaseError 基础错误结构
+type BaseError struct {
+	Code       ErrorCode              `json:"code"`
+	Message    string                 `json:"message"`
+	Details    map[string]interface{} `json:"details,omitempty"`
+	Cause      error                  `json:"-"`
+	Timestamp  time.Time              `json:"timestamp"`
+	TraceID    string                 `json:"trace_id,omitempty"`
+	Operation  string                 `json:"operation,omitempty"`
+	HTTPStatus int                    `json:"-"`
+}
 ```
 
 **本节来源**
-- [interfaces.go](file://internal/pkg/feature/interfaces.go#L10-L50)
-- [toggle_manager.go](file://internal/pkg/feature/toggle_manager.go#L50-L100)
+- [config.go](file://internal/pkg/config/config.go#L50-L100)
+- [errors.go](file://internal/pkg/errors/errors.go#L50-L100)
 
 ## 错误管理与常见问题
 

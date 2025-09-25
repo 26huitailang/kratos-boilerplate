@@ -64,10 +64,21 @@ service Auth {
 }
 
 // 获取验证码请求
+// @description 用于获取不同类型验证码的请求消息
 message GetCaptchaRequest {
-  // 验证码类型: sms, email, image
+  // 验证码类型，支持以下类型：
+  // - "image": 图片验证码
+  // - "sms": 短信验证码
+  // - "email": 邮件验证码
+  // @example "image"
+  // @required
   string captcha_type = 1;
-  // 如果是短信/邮件验证码，需要提供手机号/邮箱
+  
+  // 目标地址，当验证码类型为sms或email时必填
+  // - sms类型时：填写手机号，格式如 "+8613812345678"
+  // - email类型时：填写邮箱地址，格式如 "user@example.com"
+  // - image类型时：可选，用于指定客户端标识
+  // @example "+8613812345678" or "user@example.com"
   string target = 2;
 }
 
@@ -91,12 +102,47 @@ message VerifyCaptchaReply {
 }
 
 // 注册请求
+// @description 用户注册请求，包含用户基本信息和验证码验证
 message RegisterRequest {
+  // 用户名，长度3-32位，支持字母、数字、下划线
+  // 不能以数字开头，需要全局唯一
+  // @example "john_doe"
+  // @required
+  // @minLength 3
+  // @maxLength 32
+  // @pattern "^[a-zA-Z][a-zA-Z0-9_]*$"
   string username = 1;
+  
+  // 密码，长度8-32位，必须包含字母和数字
+  // 建议包含特殊字符以提高安全性
+  // @example "MyPassword123!"
+  // @required
+  // @minLength 8
+  // @maxLength 32
+  // @format password
   string password = 2;
+  
+  // 邮箱地址，用于账户验证和找回密码
+  // 必须是有效的邮箱格式
+  // @example "john.doe@example.com"
+  // @required
+  // @format email
   string email = 3;
+  
+  // 手机号码，用于短信验证和账户安全
+  // 支持国际格式，如+86开头的中国手机号
+  // @example "+8613812345678"
+  // @format phone
   string phone = 4;
+  
+  // 验证码ID，从GetCaptcha接口获取
+  // @example "captcha_12345"
+  // @required
   string captcha_id = 5;
+  
+  // 验证码内容，用户输入的验证码
+  // @example "ABCD"
+  // @required
   string captcha_code = 6;
 }
 
@@ -106,20 +152,53 @@ message RegisterReply {
 }
 
 // 登录请求
+// @description 用户登录请求，支持用户名密码登录和双因子认证
 message LoginRequest {
+  // 用户名，可以是注册时的用户名、邮箱或手机号
+  // @example "john_doe" or "john.doe@example.com" or "+8613812345678"
+  // @required
   string username = 1;
+  
+  // 用户密码
+  // @example "MyPassword123!"
+  // @required
+  // @format password
   string password = 2;
-  string captcha_id = 3; 
+  
+  // 验证码ID，从GetCaptcha接口获取
+  // 某些情况下可能不需要验证码（如信任设备）
+  // @example "captcha_12345"
+  string captcha_id = 3;
+  
+  // 验证码内容，对应captcha_id的验证码
+  // @example "ABCD"
   string captcha_code = 4;
-  // 如果启用TOTP，需要提供TOTP码
+  
+  // TOTP双因子认证码，当用户启用TOTP时必填
+  // 6位数字，从认证器应用生成
+  // @example "123456"
+  // @pattern "^[0-9]{6}$"
   string totp_code = 5;
 }
 
 // 登录响应
+// @description 登录成功后返回的令牌信息
 message LoginReply {
+  // 访问令牌，用于API调用时的身份验证
+  // 格式为JWT，包含用户信息和权限
+  // @example "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
   string access_token = 1;
+  
+  // 刷新令牌，用于获取新的访问令牌
+  // 有效期通常比访问令牌更长
+  // @example "refresh_token_abc123..."
   string refresh_token = 2;
-  int64 expires_in = 3;  // 过期时间（秒）
+  
+  // 访问令牌过期时间，单位为秒
+  // 表示从当前时间开始多少秒后过期
+  // @example 3600
+  // @minimum 1
+  int64 expires_in = 3;
 }
 
 // 退出登录请求
