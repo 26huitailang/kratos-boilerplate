@@ -13,7 +13,6 @@ import (
 	"kratos-boilerplate/internal/conf"
 	"kratos-boilerplate/internal/data"
 	"kratos-boilerplate/internal/pkg/captcha"
-	"kratos-boilerplate/internal/pkg/feature"
 	"kratos-boilerplate/internal/server"
 	"kratos-boilerplate/internal/service"
 )
@@ -33,12 +32,7 @@ func wireApp(confServer *conf.Server, confData *conf.Data, auth *conf.Auth, boot
 	greeterRepo := data.NewGreeterRepo(dataData, logger)
 	greeterUsecase := biz.NewGreeterUsecase(greeterRepo, logger)
 	greeterService := service.NewGreeterService(greeterUsecase)
-	featureConfig := feature.NewFeatureConfig(bootstrap)
-	featureRepository := feature.NewFeatureRepository(featureConfig, logger)
-	compositeStrategy := feature.NewCompositeStrategy()
-	toggleManager := feature.NewToggleManager(featureRepository, compositeStrategy, logger)
-	featureToggleService := service.NewFeatureToggleService(toggleManager, logger)
-	grpcServer := server.NewGRPCServer(confServer, greeterService, featureToggleService, logger)
+	grpcServer := server.NewGRPCServer(confServer, greeterService, logger)
 	kmsRepo := data.NewKMSRepo(dataData, logger)
 	kmsManager := data.NewKMSManager(kmsRepo, logger)
 	userRepo, err := data.NewUserRepo(dataData, logger, kmsManager)
@@ -51,7 +45,7 @@ func wireApp(confServer *conf.Server, confData *conf.Data, auth *conf.Auth, boot
 	authConfig := biz.NewAuthConfig(auth)
 	authUsecase := biz.NewAuthUsecase(userRepo, captchaService, authConfig, logger)
 	authService := service.NewAuthService(authUsecase, logger)
-	httpServer := server.NewHTTPServer(confServer, greeterService, authService, featureToggleService, logger)
+	httpServer := server.NewHTTPServer(confServer, greeterService, authService, logger)
 	app := newApp(logger, grpcServer, httpServer)
 	return app, func() {
 		cleanup()

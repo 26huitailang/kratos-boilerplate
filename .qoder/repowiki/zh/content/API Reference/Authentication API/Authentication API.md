@@ -2,13 +2,29 @@
 
 <cite>
 **本文档引用的文件**   
-- [auth.proto](file://api/auth/v1/auth.proto#L1-L155)
-- [auth.go](file://internal/service/auth.go#L1-L234)
-- [auth.go](file://internal/biz/auth.go#L1-L694)
-- [auth.go](file://internal/data/auth.go#L1-L437)
-- [validate.proto](file://third_party/validate/validate.proto#L1-L864)
-- [error_reason.proto](file://api/helloworld/v1/error_reason.proto#L1-L17)
+- [auth.proto](file://api/auth/v1/auth.proto#L1-L235) - *在提交 53899bd 中增强了API接口定义和功能开关管理*
+- [auth.go](file://internal/service/auth.go#L1-L234) - *实现了增强的认证服务逻辑*
+- [auth.go](file://internal/biz/auth.go#L1-L694) - *更新了业务逻辑以支持新的验证规则*
+- [auth.go](file://internal/data/auth.go#L1-L437) - *数据层实现与KMS集成*
+- [validate.proto](file://third_party/validate/validate.proto#L1-L864) - *用于输入验证的协议缓冲区规则*
+- [error_reason.proto](file://api/helloworld/v1/error_reason.proto#L1-L17) - *定义错误原因枚举*
 </cite>
+
+## 更新摘要
+**已更改内容**   
+- 根据 `auth.proto` 的最新变更，更新了用户注册、登录等请求和响应字段的描述、示例及验证规则。
+- 增强了输入验证部分，详细说明了新增的字段级验证注解。
+- 更新了客户端实现示例中的参数说明。
+
+**新增部分**
+- 在“请求/响应模式”章节中为每个gRPC消息添加了详细的文档注释说明。
+- 在“输入验证”章节中增加了对新验证规则（如 `@pattern`, `@format`）的解释。
+
+**已弃用/移除部分**
+- 无
+
+**源跟踪系统更新**
+- 所有文件链接均已更新，并标注了其在最近提交中的状态变化。
 
 ## 目录
 1. [认证API端点](#认证api端点)
@@ -47,8 +63,8 @@
 检索给定用户名的账户锁定状态，包括失败尝试次数和解锁时间。
 
 **Section sources**
-- [auth.proto](file://api/auth/v1/auth.proto#L1-L155)
-- [auth.go](file://internal/service/auth.go#L1-L234)
+- [auth.proto](file://api/auth/v1/auth.proto#L1-L235) - *在提交 53899bd 中增强了API接口定义和功能开关管理*
+- [auth.go](file://internal/service/auth.go#L1-L234) - *实现了增强的认证服务逻辑*
 
 ## 请求/响应模式
 
@@ -71,12 +87,47 @@
 
 #### 请求模式 (gRPC)
 ```protobuf
+// @description 用户注册请求，包含用户基本信息和验证码验证
 message RegisterRequest {
+  // 用户名，长度3-32位，支持字母、数字、下划线
+  // 不能以数字开头，需要全局唯一
+  // @example "john_doe"
+  // @required
+  // @minLength 3
+  // @maxLength 32
+  // @pattern "^[a-zA-Z][a-zA-Z0-9_]*$"
   string username = 1;
+  
+  // 密码，长度8-32位，必须包含字母和数字
+  // 建议包含特殊字符以提高安全性
+  // @example "MyPassword123!"
+  // @required
+  // @minLength 8
+  // @maxLength 32
+  // @format password
   string password = 2;
+  
+  // 邮箱地址，用于账户验证和找回密码
+  // 必须是有效的邮箱格式
+  // @example "john.doe@example.com"
+  // @required
+  // @format email
   string email = 3;
+  
+  // 手机号码，用于短信验证和账户安全
+  // 支持国际格式，如+86开头的中国手机号
+  // @example "+8613812345678"
+  // @format phone
   string phone = 4;
+  
+  // 验证码ID，从GetCaptcha接口获取
+  // @example "captcha_12345"
+  // @required
   string captcha_id = 5;
+  
+  // 验证码内容，用户输入的验证码
+  // @example "ABCD"
+  // @required
   string captcha_code = 6;
 }
 ```
@@ -113,11 +164,32 @@ message RegisterReply {
 
 #### 请求模式 (gRPC)
 ```protobuf
+// @description 用户登录请求，支持用户名密码登录和双因子认证
 message LoginRequest {
+  // 用户名，可以是注册时的用户名、邮箱或手机号
+  // @example "john_doe" or "john.doe@example.com" or "+8613812345678"
+  // @required
   string username = 1;
+  
+  // 用户密码
+  // @example "MyPassword123!"
+  // @required
+  // @format password
   string password = 2;
+  
+  // 验证码ID，从GetCaptcha接口获取
+  // 某些情况下可能不需要验证码（如信任设备）
+  // @example "captcha_12345"
   string captcha_id = 3;
+  
+  // 验证码内容，对应captcha_id的验证码
+  // @example "ABCD"
   string captcha_code = 4;
+  
+  // TOTP双因子认证码，当用户启用TOTP时必填
+  // 6位数字，从认证器应用生成
+  // @example "123456"
+  // @pattern "^[0-9]{6}$"
   string totp_code = 5;
 }
 ```
@@ -133,9 +205,22 @@ message LoginRequest {
 
 #### 响应模式 (gRPC)
 ```protobuf
+// @description 登录成功后返回的令牌信息
 message LoginReply {
+  // 访问令牌，用于API调用时的身份验证
+  // 格式为JWT，包含用户信息和权限
+  // @example "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
   string access_token = 1;
+  
+  // 刷新令牌，用于获取新的访问令牌
+  // 有效期通常比访问令牌更长
+  // @example "refresh_token_abc123..."
   string refresh_token = 2;
+  
+  // 访问令牌过期时间，单位为秒
+  // 表示从当前时间开始多少秒后过期
+  // @example 3600
+  // @minimum 1
   int64 expires_in = 3;
 }
 ```
@@ -207,7 +292,7 @@ message LogoutReply {
 ```
 
 **Section sources**
-- [auth.proto](file://api/auth/v1/auth.proto#L1-L155)
+- [auth.proto](file://api/auth/v1/auth.proto#L1-L235) - *在提交 53899bd 中增强了API接口定义和功能开关管理*
 
 ## gRPC到REST映射
 
@@ -253,7 +338,7 @@ click N "#认证api端点"
 ```
 
 **Diagram sources**
-- [auth.proto](file://api/auth/v1/auth.proto#L1-L155)
+- [auth.proto](file://api/auth/v1/auth.proto#L1-L235) - *在提交 53899bd 中增强了API接口定义和功能开关管理*
 
 ## 输入验证
 
@@ -262,11 +347,12 @@ click N "#认证api端点"
 ### 验证规则
 
 #### 字符串字段
-- **用户名**: 必须为3-20个字符，字母数字加下划线
+- **用户名**: 必须为3-32个字符，字母数字加下划线，且不能以数字开头
 - **密码**: 最少8个字符并满足复杂性要求
 - **邮箱**: 有效邮箱格式
-- **电话**: 有效电话号码格式
+- **电话**: 有效电话号码格式（支持国际格式）
 - **验证码ID/代码**: 必填且非空
+- **TOTP码**: 必须是6位数字
 
 #### 字段级验证
 ```protobuf
@@ -274,11 +360,12 @@ click N "#认证api端点"
 message RegisterRequest {
   string username = 1 [(validate.rules).string = {
     min_len: 3,
-    max_len: 20,
-    pattern: "^[a-zA-Z0-9_]+$"
+    max_len: 32,
+    pattern: "^[a-zA-Z][a-zA-Z0-9_]*$"
   }];
   string password = 2 [(validate.rules).string = {
     min_len: 8,
+    max_len: 32,
     pattern: "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).*$"
   }];
   string email = 3 [(validate.rules).string = {
@@ -296,11 +383,17 @@ message RegisterRequest {
     min_len: 1
   }];
 }
+
+message LoginRequest {
+  string totp_code = 5 [(validate.rules).string = {
+    pattern: "^[0-9]{6}$"
+  }];
+}
 ```
 
 **Section sources**
-- [validate.proto](file://third_party/validate/validate.proto#L1-L864)
-- [auth.proto](file://api/auth/v1/auth.proto#L1-L155)
+- [validate.proto](file://third_party/validate/validate.proto#L1-L864) - *用于输入验证的协议缓冲区规则*
+- [auth.proto](file://api/auth/v1/auth.proto#L1-L235) - *在提交 53899bd 中增强了API接口定义和功能开关管理*
 
 ## 认证和令牌管理
 
@@ -327,8 +420,8 @@ Note over AuthService,AuthUsecase : 使用HS256签名生成JWT令牌
 ```
 
 **Diagram sources**
-- [auth.go](file://internal/service/auth.go#L1-L234)
-- [auth.go](file://internal/biz/auth.go#L1-L694)
+- [auth.go](file://internal/service/auth.go#L1-L234) - *实现了增强的认证服务逻辑*
+- [auth.go](file://internal/biz/auth.go#L1-L694) - *更新了业务逻辑以支持新的验证规则*
 
 ### 令牌刷新流程
 
@@ -352,8 +445,8 @@ Note over AuthService,AuthUsecase : 防止刷新令牌重用攻击
 ```
 
 **Diagram sources**
-- [auth.go](file://internal/service/auth.go#L1-L234)
-- [auth.go](file://internal/biz/auth.go#L1-L694)
+- [auth.go](file://internal/service/auth.go#L1-L234) - *实现了增强的认证服务逻辑*
+- [auth.go](file://internal/biz/auth.go#L1-L694) - *更新了业务逻辑以支持新的验证规则*
 
 ### 令牌配置
 - **访问令牌**: 15分钟过期
@@ -378,6 +471,8 @@ Note over AuthService,AuthUsecase : 防止刷新令牌重用攻击
 | TOKEN_INVALID | 401 未授权 | 令牌格式错误或无效 |
 | TOKEN_EXPIRED | 401 未授权 | 令牌已过期 |
 | USER_EXISTS | 400 错误请求 | 用户名已存在 |
+| TOTP_REQUIRED | 400 错误请求 | 需要TOTP验证码 |
+| TOTP_INVALID | 400 错误请求 | TOTP验证码无效 |
 
 ### 错误响应模式
 
@@ -406,8 +501,8 @@ extend google.protobuf.EnumValueOptions {
 ```
 
 **Section sources**
-- [auth.go](file://internal/service/auth.go#L1-L234)
-- [error_reason.proto](file://api/helloworld/v1/error_reason.proto#L1-L17)
+- [auth.go](file://internal/service/auth.go#L1-L234) - *实现了增强的认证服务逻辑*
+- [error_reason.proto](file://api/helloworld/v1/error_reason.proto#L1-L17) - *定义错误原因枚举*
 
 ## 验证码集成
 
@@ -444,8 +539,8 @@ style J fill:#f99,stroke:#333
 ```
 
 **Diagram sources**
-- [auth.proto](file://api/auth/v1/auth.proto#L1-L155)
-- [auth.go](file://internal/biz/auth.go#L1-L694)
+- [auth.proto](file://api/auth/v1/auth.proto#L1-L235) - *在提交 53899bd 中增强了API接口定义和功能开关管理*
+- [auth.go](file://internal/biz/auth.go#L1-L694) - *更新了业务逻辑以支持新的验证规则*
 
 ## 安全考虑
 
@@ -504,8 +599,8 @@ style H fill:#69f,stroke:#333
 ```
 
 **Diagram sources**
-- [auth.go](file://internal/biz/auth.go#L1-L694)
-- [auth.go](file://internal/data/auth.go#L1-L437)
+- [auth.go](file://internal/biz/auth.go#L1-L694) - *更新了业务逻辑以支持新的验证规则*
+- [auth.go](file://internal/data/auth.go#L1-L437) - *数据层实现与KMS集成*
 
 ## 客户端实现示例
 
@@ -693,5 +788,5 @@ authService.login({
 ```
 
 **Section sources**
-- [auth.go](file://internal/service/auth.go#L1-L234)
-- [auth.proto](file://api/auth/v1/auth.proto#L1-L155)
+- [auth.go](file://internal/service/auth.go#L1-L234) - *实现了增强的认证服务逻辑*
+- [auth.proto](file://api/auth/v1/auth.proto#L1-L235) - *在提交 53899bd 中增强了API接口定义和功能开关管理*

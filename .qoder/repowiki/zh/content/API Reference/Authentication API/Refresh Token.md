@@ -107,7 +107,7 @@ func (uc *authUsecase) RefreshToken(ctx context.Context, refreshToken string) (*
 ```
 
 **Section sources**
-- [auth.go](file://internal/biz/auth.go#L385-L469)
+- [auth.go](file://internal/biz/auth.go#L417-L459)
 
 ## 响应结构
 
@@ -179,7 +179,7 @@ default:
 ```
 
 **Section sources**
-- [auth.go](file://internal/service/auth.go#L205-L234)
+- [auth.go](file://internal/service/auth.go#L159-L184)
 
 ## 安全考虑
 
@@ -211,7 +211,7 @@ if used {
 这可以防止令牌被盗和重放攻击。
 
 **Section sources**
-- [auth.go](file://internal/biz/auth.go#L433-L469)
+- [auth.go](file://internal/biz/auth.go#L417-L459)
 
 ## 实现示例
 
@@ -285,7 +285,7 @@ const refreshTokenAction = async () => {
 ```
 
 **Section sources**
-- [auth.ts](file://frontend/src/api/auth.ts#L78-L85)
+- [auth.ts](file://frontend/src/api/auth.ts#L85-L98)
 - [auth.ts](file://frontend/src/stores/auth.ts#L65-L84)
 
 ## 序列图
@@ -312,5 +312,5 @@ Note over Client,Service : 令牌轮换 : 旧的刷新令牌<br/>被使失效，
 ```
 
 **Diagram sources**
-- [auth.go](file://internal/biz/auth.go#L385-L469)
-- [auth.go](file://internal/service/auth.go#L205-L234)
+- [auth.go](file://internal/biz/auth.go#L417-L459)
+- [auth.go](file://internal/service/auth.go#L159-L184)

@@ -2,13 +2,12 @@
 
 <cite>
 **本文档中引用的文件**   
-- [auth.proto](file://api/auth/v1/auth.proto)
-- [auth.go](file://internal/biz/auth.go)
-- [auth_test.go](file://internal/biz/auth_test.go)
-- [auth_service.go](file://internal/service/auth.go)
-- [auth_bdd_test.go](file://test/bdd/auth/auth_bdd_test.go)
-- [auth.ts](file://frontend/src/api/auth.ts)
-- [conf.pb.go](file://internal/conf/conf.pb.go)
+- [auth.proto](file://api/auth/v1/auth.proto) - *在提交 53899bd486 中更新*
+- [auth.go](file://internal/biz/auth.go) - *实现认证逻辑*
+- [auth_test.go](file://internal/biz/auth_test.go) - *包含单元测试用例*
+- [auth_service.go](file://internal/service/auth.go) - *gRPC服务实现*
+- [auth.ts](file://frontend/src/api/auth.ts) - *前端API调用*
+- [captcha.go](file://internal/data/captcha.go) - *验证码数据访问层*
 </cite>
 
 ## 更新摘要
@@ -69,7 +68,7 @@ rpc Login(LoginRequest) returns (LoginReply) {
 | `password` | string | 是 | 用户密码 |
 | `captchaId` | string | 条件性 | 验证码标识符（当启用验证码时需要） |
 | `captchaCode` | string | 条件性 | 验证码值（当启用验证码时需要） |
-| `totpCode` | string | 条件性 | TOTP验证码（当用户启用了TOTP时需要） |
+| `totpCode` | string | 条件性 | TOTP双因子认证码（当用户启用了TOTP时需要） |
 
 JSON请求示例：
 ```json

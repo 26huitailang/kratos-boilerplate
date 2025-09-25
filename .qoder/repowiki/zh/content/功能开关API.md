@@ -2,13 +2,20 @@
 
 <cite>
 **本文档引用的文件**
-- [feature.proto](file://api/feature/v1/feature.proto#L1-L181)
-- [feature.go](file://internal/service/feature.go#L1-L337)
+- [feature.proto](file://api/feature/v1/feature.proto#L1-L256) - *在提交 53899bd486902c0e9420c119eb7d2f8e0cae0d5a 中更新*
+- [feature.go](file://internal/service/feature.go#L1-L337) - *在提交 53899bd486902c0e9420c119eb7d2f8e0cae0d5a 中更新*
 - [toggle_manager.go](file://internal/pkg/feature/toggle_manager.go#L1-L642)
 - [interfaces.go](file://internal/pkg/feature/interfaces.go#L1-L237)
 - [strategies.go](file://internal/pkg/feature/strategies.go#L1-L277)
 - [features.yaml](file://configs/features.yaml#L1-L340)
 </cite>
+
+## 更新摘要
+**已做更改**
+- 更新了 **ListToggles** 接口说明，补充了分页、标签过滤和启用状态过滤的详细参数描述
+- 在接口文档中添加了 `enabled_only` 查询参数的说明
+- 增强了请求参数的示例和约束说明（如 page_size 最大值为1000）
+- 更新了相关代码文件来源标注，反映最新提交变更
 
 ## 目录
 1. [功能开关API概述](#功能开关api概述)
@@ -337,10 +344,10 @@ GET /api/v1/features
 ```
 
 **请求参数**
-- `page`: 页码（默认1）
-- `page_size`: 每页数量（默认20）
-- `tags`: 标签过滤
-- `enabled_only`: 仅返回启用的功能
+- `page`: 页码（默认1，最小1）
+- `page_size`: 每页数量（默认20，最小1，最大1000）
+- `tags`: 标签过滤（可指定多个标签，如auth、api、user、system等）
+- `enabled_only`: 仅返回启用的功能（布尔值，默认false）
 
 **响应结构**
 ```json
@@ -366,8 +373,8 @@ GET /api/v1/features
 ```
 
 **Section sources**
-- [feature.proto](file://api/feature/v1/feature.proto#L1-L181)
-- [feature.go](file://internal/service/feature.go#L1-L337)
+- [feature.proto](file://api/feature/v1/feature.proto#L1-L256) - *在提交 53899bd486902c0e9420c119eb7d2f8e0cae0d5a 中更新*
+- [feature.go](file://internal/service/feature.go#L33-L88) - *在提交 53899bd486902c0e9420c119eb7d2f8e0cae0d5a 中更新*
 
 ### GetToggle - 获取单个功能开关
 
@@ -403,8 +410,8 @@ GET /api/v1/features/{flag}
 - `TOGGLE_NOT_FOUND`: 功能开关不存在
 
 **Section sources**
-- [feature.proto](file://api/feature/v1/feature.proto#L1-L181)
-- [feature.go](file://internal/service/feature.go#L1-L337)
+- [feature.proto](file://api/feature/v1/feature.proto#L1-L256)
+- [feature.go](file://internal/service/feature.go#L91-L105)
 
 ### UpdateToggle - 更新功能开关
 
@@ -457,8 +464,8 @@ PUT /api/v1/features/{flag}
 - `UPDATE_FAILED`: 更新失败
 
 **Section sources**
-- [feature.proto](file://api/feature/v1/feature.proto#L1-L181)
-- [feature.go](file://internal/service/feature.go#L1-L337)
+- [feature.proto](file://api/feature/v1/feature.proto#L1-L256)
+- [feature.go](file://internal/service/feature.go#L108-L125)
 
 ### EnableToggle - 启用功能开关
 
@@ -499,8 +506,8 @@ POST /api/v1/features/{flag}/enable
 - `ENABLE_FAILED`: 启用失败
 
 **Section sources**
-- [feature.proto](file://api/feature/v1/feature.proto#L1-L181)
-- [feature.go](file://internal/service/feature.go#L1-L337)
+- [feature.proto](file://api/feature/v1/feature.proto#L1-L256)
+- [feature.go](file://internal/service/feature.go#L128-L143)
 
 ### DisableToggle - 禁用功能开关
 
@@ -541,8 +548,8 @@ POST /api/v1/features/{flag}/disable
 - `DISABLE_FAILED`: 禁用失败
 
 **Section sources**
-- [feature.proto](file://api/feature/v1/feature.proto#L1-L181)
-- [feature.go](file://internal/service/feature.go#L1-L337)
+- [feature.proto](file://api/feature/v1/feature.proto#L1-L256)
+- [feature.go](file://internal/service/feature.go#L146-L161)
 
 ### DeleteToggle - 删除功能开关
 
@@ -567,8 +574,8 @@ DELETE /api/v1/features/{flag}
 - `DELETE_FAILED`: 删除失败
 
 **Section sources**
-- [feature.proto](file://api/feature/v1/feature.proto#L1-L181)
-- [feature.go](file://internal/service/feature.go#L1-L337)
+- [feature.proto](file://api/feature/v1/feature.proto#L1-L256)
+- [feature.go](file://internal/service/feature.go#L164-L174)
 
 ### EvaluateToggle - 评估功能开关
 
@@ -609,8 +616,8 @@ POST /api/v1/features/{flag}/evaluate
 - 如果功能开关不存在，默认返回`enabled: true`
 
 **Section sources**
-- [feature.proto](file://api/feature/v1/feature.proto#L1-L181)
-- [feature.go](file://internal/service/feature.go#L1-L337)
+- [feature.proto](file://api/feature/v1/feature.proto#L1-L256)
+- [feature.go](file://internal/service/feature.go#L177-L202)
 
 ### GetStats - 获取功能开关统计
 
@@ -638,8 +645,8 @@ GET /api/v1/features/stats
 ```
 
 **Section sources**
-- [feature.proto](file://api/feature/v1/feature.proto#L1-L181)
-- [feature.go](file://internal/service/feature.go#L1-L337)
+- [feature.proto](file://api/feature/v1/feature.proto#L1-L256)
+- [feature.go](file://internal/service/feature.go#L205-L225)
 
 ## 配置文件结构
 
@@ -735,7 +742,7 @@ swagger_ui:
 ### 获取所有功能开关
 
 ```bash
-curl -X GET "http://localhost:8000/api/v1/features?page=1&page_size=10" \
+curl -X GET "http://localhost:8000/api/v1/features?page=1&page_size=10&tags=auth&enabled_only=true" \
   -H "Content-Type: application/json"
 ```
 
@@ -832,4 +839,4 @@ if err != nil {
 
 **Section sources**
 - [examples/feature_toggle_example.go](file://examples/feature_toggle_example.go)
-- [feature.proto](file://api/feature/v1/feature.proto#L1-L181)
+- [feature.proto](file://api/feature/v1/feature.proto#L1-L256)

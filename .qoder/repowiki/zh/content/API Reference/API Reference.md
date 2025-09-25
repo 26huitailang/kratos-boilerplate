@@ -1,4 +1,3 @@
-<docs>
 # API 参考
 
 <cite>

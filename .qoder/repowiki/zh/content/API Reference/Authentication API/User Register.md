@@ -2,10 +2,10 @@
 
 <cite>
 **本文档引用的文件**   
-- [auth.proto](file://api/auth/v1/auth.proto) - *在最近提交中更新*
-- [auth.go](file://internal/biz/auth.go) - *在最近提交中更新*
-- [auth.go](file://internal/service/auth.go) - *在最近提交中更新*
-- [auth.go](file://internal/data/auth.go) - *在最近提交中更新*
+- [auth.proto](file://api/auth/v1/auth.proto) - *在最近提交中更新，增强了字段验证规则*
+- [auth.go](file://internal/biz/auth.go) - *在最近提交中更新，包含业务逻辑实现*
+- [auth.go](file://internal/service/auth.go) - *在最近提交中更新，gRPC服务层实现*
+- [auth.go](file://internal/data/auth.go) - *数据访问层实现*
 - [validate.proto](file://third_party/validate/validate.proto) - *验证规则定义*
 </cite>
 
