@@ -22,17 +22,17 @@ import (
 // Config 链路追踪配置
 type Config struct {
 	// 基础配置
-	ServiceName    string  `yaml:"service_name" json:"service_name"`
-	ServiceVersion string  `yaml:"service_version" json:"service_version"`
-	Environment    string  `yaml:"environment" json:"environment"`
-	Enabled        bool    `yaml:"enabled" json:"enabled"`
-	
+	ServiceName    string `yaml:"service_name" json:"service_name"`
+	ServiceVersion string `yaml:"service_version" json:"service_version"`
+	Environment    string `yaml:"environment" json:"environment"`
+	Enabled        bool   `yaml:"enabled" json:"enabled"`
+
 	// Jaeger配置
 	Jaeger JaegerConfig `yaml:"jaeger" json:"jaeger"`
-	
+
 	// 采样配置
 	Sampling SamplingConfig `yaml:"sampling" json:"sampling"`
-	
+
 	// 资源配置
 	Resource ResourceConfig `yaml:"resource" json:"resource"`
 }
@@ -46,8 +46,8 @@ type JaegerConfig struct {
 
 // SamplingConfig 采样配置
 type SamplingConfig struct {
-	Type  string  `yaml:"type" json:"type"`    // always_on, always_off, ratio
-	Ratio float64 `yaml:"ratio" json:"ratio"`  // 采样比例 0.0-1.0
+	Type  string  `yaml:"type" json:"type"`   // always_on, always_off, ratio
+	Ratio float64 `yaml:"ratio" json:"ratio"` // 采样比例 0.0-1.0
 }
 
 // ResourceConfig 资源配置
@@ -90,7 +90,7 @@ func NewTracingProvider(config *Config, logger log.Logger) (*TracingProvider, er
 	if config == nil {
 		config = DefaultConfig()
 	}
-	
+
 	if !config.Enabled {
 		return &TracingProvider{
 			tracer: oteltrace.NewNoopTracerProvider().Tracer("noop"),
@@ -98,41 +98,41 @@ func NewTracingProvider(config *Config, logger log.Logger) (*TracingProvider, er
 			logger: logger,
 		}, nil
 	}
-	
+
 	// 创建资源
 	res, err := createResource(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create resource: %w", err)
 	}
-	
+
 	// 创建导出器
 	exporter, err := createJaegerExporter(config.Jaeger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create jaeger exporter: %w", err)
 	}
-	
+
 	// 创建采样器
 	sampler := createSampler(config.Sampling)
-	
+
 	// 创建TraceProvider
 	provider := trace.NewTracerProvider(
 		trace.WithBatcher(exporter),
 		trace.WithResource(res),
 		trace.WithSampler(sampler),
 	)
-	
+
 	// 设置全局TraceProvider
 	otel.SetTracerProvider(provider)
-	
+
 	// 设置全局传播器
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
 		propagation.TraceContext{},
 		propagation.Baggage{},
 	))
-	
+
 	// 创建Tracer
 	tracer := provider.Tracer(config.ServiceName)
-	
+
 	return &TracingProvider{
 		tracer:   tracer,
 		provider: provider,
@@ -148,12 +148,12 @@ func createResource(config *Config) (*resource.Resource, error) {
 		semconv.ServiceVersion(config.ServiceVersion),
 		semconv.DeploymentEnvironment(config.Environment),
 	}
-	
+
 	// 添加自定义属性
 	for key, value := range config.Resource.Attributes {
 		attributes = append(attributes, attribute.String(key, value))
 	}
-	
+
 	return resource.Merge(
 		resource.Default(),
 		resource.NewWithAttributes(
@@ -168,12 +168,12 @@ func createJaegerExporter(config JaegerConfig) (trace.SpanExporter, error) {
 	opts := []jaeger.CollectorEndpointOption{
 		jaeger.WithEndpoint(config.Endpoint),
 	}
-	
+
 	if config.Username != "" && config.Password != "" {
 		opts = append(opts, jaeger.WithUsername(config.Username))
 		opts = append(opts, jaeger.WithPassword(config.Password))
 	}
-	
+
 	return jaeger.New(jaeger.WithCollectorEndpoint(opts...))
 }
 
@@ -212,28 +212,35 @@ func (tp *TracingProvider) Middleware() middleware.Middleware {
 				operation string
 				kind      string
 			)
-			
+
 			// 获取传输信息
 			if tr, ok := transport.FromServerContext(ctx); ok {
 				operation = tr.Operation()
 				kind = tr.Kind().String()
 			}
-			
+
 			if operation == "" {
 				operation = "unknown"
 			}
-			
+
 			// 从请求头中提取跟踪上下文
 			carrier := make(propagation.MapCarrier)
 			if tr, ok := transport.FromServerContext(ctx); ok {
 				headers := tr.RequestHeader()
-				for key := range headers {
-					carrier[key] = headers.Get(key)
+				// 直接访问 header 值
+				if traceParent := headers.Get("traceparent"); traceParent != "" {
+					carrier["traceparent"] = traceParent
+				}
+				if traceState := headers.Get("tracestate"); traceState != "" {
+					carrier["tracestate"] = traceState
+				}
+				if baggage := headers.Get("baggage"); baggage != "" {
+					carrier["baggage"] = baggage
 				}
 			}
-			
+
 			ctx = otel.GetTextMapPropagator().Extract(ctx, carrier)
-			
+
 			// 创建Span
 			ctx, span := tp.tracer.Start(ctx, operation,
 				oteltrace.WithSpanKind(getSpanKind(kind)),
@@ -244,10 +251,10 @@ func (tp *TracingProvider) Middleware() middleware.Middleware {
 				),
 			)
 			defer span.End()
-			
+
 			// 执行处理器
 			reply, err := handler(ctx, req)
-			
+
 			// 记录错误
 			if err != nil {
 				span.RecordError(err)
@@ -255,7 +262,7 @@ func (tp *TracingProvider) Middleware() middleware.Middleware {
 			} else {
 				span.SetStatus(codes.Ok, "success")
 			}
-			
+
 			return reply, err
 		}
 	}
@@ -358,14 +365,14 @@ func (tl *TracingLogger) LogWithContext(ctx context.Context, level log.Level, ke
 	// 添加追踪ID到日志
 	traceID := TraceIDFromContext(ctx)
 	spanID := SpanIDFromContext(ctx)
-	
+
 	if traceID != "" {
 		keyvals = append(keyvals, "trace_id", traceID)
 	}
 	if spanID != "" {
 		keyvals = append(keyvals, "span_id", spanID)
 	}
-	
+
 	return tl.logger.Log(level, keyvals...)
 }
 
@@ -391,21 +398,21 @@ func (ct *ClientTracing) WrapHTTPClient(ctx context.Context, method, url string,
 		),
 	)
 	defer span.End()
-	
+
 	// 注入追踪信息到HTTP头
 	carrier := make(propagation.MapCarrier)
 	otel.GetTextMapPropagator().Inject(ctx, carrier)
-	
+
 	// 执行HTTP请求
 	err := fn(ctx)
-	
+
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
 	} else {
 		span.SetStatus(codes.Ok, "success")
 	}
-	
+
 	return err
 }
 
@@ -419,17 +426,17 @@ func (ct *ClientTracing) WrapGRPCClient(ctx context.Context, method string, fn f
 		),
 	)
 	defer span.End()
-	
+
 	// 执行gRPC请求
 	err := fn(ctx)
-	
+
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
 	} else {
 		span.SetStatus(codes.Ok, "success")
 	}
-	
+
 	return err
 }
 
@@ -448,7 +455,7 @@ func NewDatabaseTracing(tracer oteltrace.Tracer) *DatabaseTracing {
 // WrapQuery 包装数据库查询
 func (dt *DatabaseTracing) WrapQuery(ctx context.Context, operation, table, sql string, fn func(ctx context.Context) error) error {
 	spanName := fmt.Sprintf("db.%s %s", operation, table)
-	
+
 	ctx, span := dt.tracer.Start(ctx, spanName,
 		oteltrace.WithSpanKind(oteltrace.SpanKindClient),
 		oteltrace.WithAttributes(
@@ -459,22 +466,22 @@ func (dt *DatabaseTracing) WrapQuery(ctx context.Context, operation, table, sql 
 		),
 	)
 	defer span.End()
-	
+
 	start := time.Now()
 	err := fn(ctx)
 	duration := time.Since(start)
-	
+
 	span.SetAttributes(
 		attribute.Int64("db.duration_ms", duration.Milliseconds()),
 	)
-	
+
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
 	} else {
 		span.SetStatus(codes.Ok, "success")
 	}
-	
+
 	return err
 }
 
@@ -493,7 +500,7 @@ func NewCacheTracing(tracer oteltrace.Tracer) *CacheTracing {
 // WrapOperation 包装缓存操作
 func (ct *CacheTracing) WrapOperation(ctx context.Context, operation, key string, fn func(ctx context.Context) error) error {
 	spanName := fmt.Sprintf("cache.%s", operation)
-	
+
 	ctx, span := ct.tracer.Start(ctx, spanName,
 		oteltrace.WithSpanKind(oteltrace.SpanKindClient),
 		oteltrace.WithAttributes(
@@ -503,29 +510,29 @@ func (ct *CacheTracing) WrapOperation(ctx context.Context, operation, key string
 		),
 	)
 	defer span.End()
-	
+
 	start := time.Now()
 	err := fn(ctx)
 	duration := time.Since(start)
-	
+
 	span.SetAttributes(
 		attribute.Int64("cache.duration_ms", duration.Milliseconds()),
 	)
-	
+
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
 	} else {
 		span.SetStatus(codes.Ok, "success")
 	}
-	
+
 	return err
 }
 
 // TracingHelper 链路追踪助手
 type TracingHelper struct {
-	tracer   oteltrace.Tracer
-	logger   log.Logger
+	tracer oteltrace.Tracer
+	logger log.Logger
 }
 
 // NewTracingHelper 创建链路追踪助手
@@ -540,9 +547,9 @@ func NewTracingHelper(tracer oteltrace.Tracer, logger log.Logger) *TracingHelper
 func (th *TracingHelper) WithSpan(ctx context.Context, name string, fn func(ctx context.Context) error, opts ...oteltrace.SpanStartOption) error {
 	ctx, span := th.tracer.Start(ctx, name, opts...)
 	defer span.End()
-	
+
 	err := fn(ctx)
-	
+
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
@@ -550,7 +557,7 @@ func (th *TracingHelper) WithSpan(ctx context.Context, name string, fn func(ctx 
 	} else {
 		span.SetStatus(codes.Ok, "success")
 	}
-	
+
 	return err
 }
 
@@ -560,10 +567,10 @@ func (th *TracingHelper) TraceAsync(ctx context.Context, name string, fn func(ct
 	ctx, span := th.tracer.Start(ctx, name,
 		oteltrace.WithSpanKind(oteltrace.SpanKindInternal),
 	)
-	
+
 	go func() {
 		defer span.End()
-		
+
 		defer func() {
 			if r := recover(); r != nil {
 				err := fmt.Errorf("async operation panic: %v", r)
@@ -572,7 +579,7 @@ func (th *TracingHelper) TraceAsync(ctx context.Context, name string, fn func(ct
 				th.logger.Log(log.LevelError, "msg", "async span panic", "span", name, "panic", r)
 			}
 		}()
-		
+
 		fn(ctx)
 		span.SetStatus(codes.Ok, "success")
 	}()

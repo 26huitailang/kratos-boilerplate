@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"runtime/debug"
-	"strconv"
 	"strings"
 	"time"
 
@@ -44,14 +43,14 @@ func RequestID() middleware.Middleware {
 					requestID = reqID
 				}
 			}
-			
+
 			if requestID == "" {
 				requestID = generateRequestID()
 			}
-			
+
 			// 将请求ID注入到上下文
 			ctx = context.WithValue(ctx, "request_id", requestID)
-			
+
 			return handler(ctx, req)
 		}
 	}
@@ -67,18 +66,18 @@ func Logging(logger log.Logger) middleware.Middleware {
 				kind      string
 				operation string
 			)
-			
+
 			startTime := time.Now()
-			
+
 			// 获取传输信息
 			if info, ok := transport.FromServerContext(ctx); ok {
 				kind = info.Kind().String()
 				operation = info.Operation()
 			}
-			
+
 			// 获取请求ID
 			requestID := getRequestIDFromContext(ctx)
-			
+
 			// 记录请求日志
 			logger.Log(log.LevelInfo,
 				"msg", "request started",
@@ -87,10 +86,10 @@ func Logging(logger log.Logger) middleware.Middleware {
 				"request_id", requestID,
 				"timestamp", startTime.Format(time.RFC3339),
 			)
-			
+
 			// 执行处理器
 			reply, err := handler(ctx, req)
-			
+
 			// 处理错误
 			if err != nil {
 				if se := errors.FromError(err); se != nil {
@@ -98,15 +97,15 @@ func Logging(logger log.Logger) middleware.Middleware {
 					reason = se.Reason
 				}
 			}
-			
+
 			duration := time.Since(startTime)
-			
+
 			// 记录响应日志
 			level := log.LevelInfo
 			if err != nil {
 				level = log.LevelError
 			}
-			
+
 			logger.Log(level,
 				"msg", "request completed",
 				"kind", kind,
@@ -117,7 +116,7 @@ func Logging(logger log.Logger) middleware.Middleware {
 				"duration", duration.String(),
 				"error", err,
 			)
-			
+
 			return reply, err
 		}
 	}
@@ -133,13 +132,13 @@ type RateLimitConfig struct {
 // RateLimit 限流中间件
 func RateLimit(config *RateLimitConfig) middleware.Middleware {
 	limiter := NewTokenBucket(config.Rate, config.Burst)
-	
+
 	return func(handler middleware.Handler) middleware.Handler {
 		return func(ctx context.Context, req interface{}) (interface{}, error) {
 			if !limiter.Allow() {
 				return nil, errors.New(429, "RATE_LIMIT_EXCEEDED", "Rate limit exceeded")
 			}
-			
+
 			return handler(ctx, req)
 		}
 	}
@@ -170,7 +169,7 @@ func CORS(config *CORSConfig) middleware.Middleware {
 	if config == nil {
 		config = DefaultCORSConfig()
 	}
-	
+
 	return func(handler middleware.Handler) middleware.Handler {
 		return func(ctx context.Context, req interface{}) (interface{}, error) {
 			// 这里主要是示例，实际CORS处理通常在HTTP层处理
@@ -188,30 +187,30 @@ func Metrics(recorder MetricsRecorder) middleware.Middleware {
 				kind      string
 				operation string
 			)
-			
+
 			startTime := time.Now()
-			
+
 			// 获取传输信息
 			if info, ok := transport.FromServerContext(ctx); ok {
 				kind = info.Kind().String()
 				operation = info.Operation()
 			}
-			
+
 			// 记录请求开始
 			recorder.RequestStarted(kind, operation)
-			
+
 			// 执行处理器
 			reply, err := handler(ctx, req)
-			
+
 			// 记录请求结束
 			duration := time.Since(startTime)
-			
+
 			if err != nil {
 				recorder.RequestFailed(kind, operation, duration)
 			} else {
 				recorder.RequestSucceeded(kind, operation, duration)
 			}
-			
+
 			return reply, err
 		}
 	}
@@ -231,7 +230,7 @@ func Validate(validator Validator) middleware.Middleware {
 			if err := validator.Validate(req); err != nil {
 				return nil, errors.BadRequest("VALIDATION_ERROR", err.Error())
 			}
-			
+
 			return handler(ctx, req)
 		}
 	}
@@ -263,11 +262,11 @@ func NewTokenBucket(rate, burst int) *TokenBucket {
 // Allow 检查是否允许请求
 func (tb *TokenBucket) Allow() bool {
 	now := time.Now()
-	
+
 	// 根据时间流逝补充令牌
 	elapsed := now.Sub(tb.lastToken)
 	tokensToAdd := int(elapsed.Seconds()) * tb.rate
-	
+
 	if tokensToAdd > 0 {
 		tb.tokens += tokensToAdd
 		if tb.tokens > tb.burst {
@@ -275,34 +274,34 @@ func (tb *TokenBucket) Allow() bool {
 		}
 		tb.lastToken = now
 	}
-	
+
 	// 检查是否有可用令牌
 	if tb.tokens > 0 {
 		tb.tokens--
 		return true
 	}
-	
+
 	return false
 }
 
 // Circuit 熔断器中间件
 func Circuit(config *CircuitConfig) middleware.Middleware {
 	breaker := NewCircuitBreaker(config)
-	
+
 	return func(handler middleware.Handler) middleware.Handler {
 		return func(ctx context.Context, req interface{}) (interface{}, error) {
 			if !breaker.Allow() {
 				return nil, errors.ServiceUnavailable("CIRCUIT_BREAKER_OPEN", "Circuit breaker is open")
 			}
-			
+
 			reply, err := handler(ctx, req)
-			
+
 			if err != nil {
 				breaker.RecordFailure()
 			} else {
 				breaker.RecordSuccess()
 			}
-			
+
 			return reply, err
 		}
 	}
@@ -317,11 +316,11 @@ type CircuitConfig struct {
 
 // CircuitBreaker 熔断器
 type CircuitBreaker struct {
-	config        *CircuitConfig
-	state         CircuitState
-	failures      int
-	requests      int
-	lastFailTime  time.Time
+	config       *CircuitConfig
+	state        CircuitState
+	failures     int
+	requests     int
+	lastFailTime time.Time
 }
 
 // CircuitState 熔断器状态
@@ -363,7 +362,7 @@ func (cb *CircuitBreaker) Allow() bool {
 // RecordSuccess 记录成功
 func (cb *CircuitBreaker) RecordSuccess() {
 	cb.requests++
-	
+
 	if cb.state == StateHalfOpen {
 		if cb.requests >= cb.config.RequestThreshold {
 			cb.state = StateClosed
@@ -376,7 +375,7 @@ func (cb *CircuitBreaker) RecordSuccess() {
 func (cb *CircuitBreaker) RecordFailure() {
 	cb.failures++
 	cb.lastFailTime = time.Now()
-	
+
 	if cb.failures >= cb.config.FailureThreshold {
 		cb.state = StateOpen
 	}
@@ -388,7 +387,7 @@ func Timeout(timeout time.Duration) middleware.Middleware {
 		return func(ctx context.Context, req interface{}) (interface{}, error) {
 			ctx, cancel := context.WithTimeout(ctx, timeout)
 			defer cancel()
-			
+
 			return handler(ctx, req)
 		}
 	}
@@ -438,7 +437,7 @@ func DefaultMiddlewares(logger log.Logger) []middleware.Middleware {
 		Use(Recovery(logger)).
 		Use(RequestID()).
 		Use(Logging(logger)).
-		Use(Timeout(30*time.Second)).
+		Use(Timeout(30 * time.Second)).
 		Build()
 }
 
@@ -454,20 +453,20 @@ func Auth(authenticator Authenticator) middleware.Middleware {
 					token = strings.TrimPrefix(auth, "Bearer ")
 				}
 			}
-			
+
 			if token == "" {
 				return nil, errors.Unauthorized("MISSING_TOKEN", "Missing authentication token")
 			}
-			
+
 			// 验证令牌
 			userInfo, err := authenticator.Authenticate(ctx, token)
 			if err != nil {
 				return nil, errors.Unauthorized("INVALID_TOKEN", "Invalid authentication token")
 			}
-			
+
 			// 将用户信息注入上下文
 			ctx = context.WithValue(ctx, "user_info", userInfo)
-			
+
 			return handler(ctx, req)
 		}
 	}
@@ -487,23 +486,23 @@ func Permission(authorizer Authorizer) middleware.Middleware {
 			if userInfo == nil {
 				return nil, errors.Unauthorized("NO_USER_INFO", "No user information found")
 			}
-			
+
 			// 获取操作信息
 			var operation string
 			if tr, ok := transport.FromServerContext(ctx); ok {
 				operation = tr.Operation()
 			}
-			
+
 			// 检查权限
 			allowed, err := authorizer.Authorize(ctx, userInfo, operation, req)
 			if err != nil {
 				return nil, errors.InternalServer("AUTHORIZATION_ERROR", "Authorization check failed")
 			}
-			
+
 			if !allowed {
 				return nil, errors.Forbidden("PERMISSION_DENIED", "Permission denied")
 			}
-			
+
 			return handler(ctx, req)
 		}
 	}
@@ -522,7 +521,7 @@ func HealthCheck(healthChecker HealthChecker) middleware.Middleware {
 			if !healthChecker.IsHealthy(ctx) {
 				return nil, errors.ServiceUnavailable("SERVICE_UNHEALTHY", "Service is currently unhealthy")
 			}
-			
+
 			return handler(ctx, req)
 		}
 	}
@@ -538,20 +537,20 @@ func Retry(config *RetryConfig) middleware.Middleware {
 	return func(handler middleware.Handler) middleware.Handler {
 		return func(ctx context.Context, req interface{}) (interface{}, error) {
 			var lastErr error
-			
+
 			for i := 0; i <= config.MaxRetries; i++ {
 				reply, err := handler(ctx, req)
 				if err == nil {
 					return reply, nil
 				}
-				
+
 				lastErr = err
-				
+
 				// 检查是否为可重试错误
 				if !config.ShouldRetry(err) {
 					break
 				}
-				
+
 				// 如果不是最后一次重试，等待后重试
 				if i < config.MaxRetries {
 					select {
@@ -562,7 +561,7 @@ func Retry(config *RetryConfig) middleware.Middleware {
 					}
 				}
 			}
-			
+
 			return nil, lastErr
 		}
 	}

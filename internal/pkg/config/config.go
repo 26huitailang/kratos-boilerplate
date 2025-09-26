@@ -41,7 +41,7 @@ type Config struct {
 			Timeout time.Duration `yaml:"timeout"`
 		} `yaml:"grpc"`
 	} `yaml:"server"`
-	
+
 	Data struct {
 		Database struct {
 			Driver string `yaml:"driver" validate:"required,oneof=postgres mysql"`
@@ -53,18 +53,18 @@ type Config struct {
 			WriteTimeout time.Duration `yaml:"write_timeout"`
 		} `yaml:"redis"`
 	} `yaml:"data"`
-	
+
 	Auth struct {
-		JWTSecretKey             string        `yaml:"jwt_secret_key" validate:"required,min=16"`
-		AccessTokenExpiration    time.Duration `yaml:"access_token_expiration"`
-		RefreshTokenExpiration   time.Duration `yaml:"refresh_token_expiration"`
-		CaptchaEnabled           bool          `yaml:"captcha_enabled"`
-		CaptchaExpiration        time.Duration `yaml:"captcha_expiration"`
-		MaxLoginAttempts         int           `yaml:"max_login_attempts" validate:"min=1,max=10"`
-		LockDuration            time.Duration `yaml:"lock_duration"`
-		TOTPEnabled             bool          `yaml:"totp_enabled"`
+		JWTSecretKey           string        `yaml:"jwt_secret_key" validate:"required,min=16"`
+		AccessTokenExpiration  time.Duration `yaml:"access_token_expiration"`
+		RefreshTokenExpiration time.Duration `yaml:"refresh_token_expiration"`
+		CaptchaEnabled         bool          `yaml:"captcha_enabled"`
+		CaptchaExpiration      time.Duration `yaml:"captcha_expiration"`
+		MaxLoginAttempts       int           `yaml:"max_login_attempts" validate:"min=1,max=10"`
+		LockDuration           time.Duration `yaml:"lock_duration"`
+		TOTPEnabled            bool          `yaml:"totp_enabled"`
 	} `yaml:"auth"`
-	
+
 	Log struct {
 		Level  string `yaml:"level" validate:"oneof=debug info warn error fatal"`
 		Format string `yaml:"format" validate:"oneof=json text"`
@@ -77,11 +77,11 @@ type Config struct {
 			Compress   bool   `yaml:"compress"`
 		} `yaml:"file"`
 	} `yaml:"log"`
-	
+
 	Tracing struct {
-		Enabled bool   `yaml:"enabled"`
+		Enabled bool `yaml:"enabled"`
 		Jaeger  struct {
-			Endpoint string  `yaml:"endpoint"`
+			Endpoint   string  `yaml:"endpoint"`
 			SampleRate float64 `yaml:"sample_rate" validate:"min=0,max=1"`
 		} `yaml:"jaeger"`
 	} `yaml:"tracing"`
@@ -112,11 +112,11 @@ func NewManager(configPath, environment string, logger log.Logger) *Manager {
 // Load 加载配置
 func (m *Manager) Load() error {
 	var sources []config.Source
-	
+
 	// 添加文件配置源
 	if m.configPath != "" {
 		sources = append(sources, file.NewSource(m.configPath))
-		
+
 		// 如果有环境特定配置文件，也加载它
 		if m.environment != "" {
 			envConfigPath := m.getEnvConfigPath(m.configPath, m.environment)
@@ -125,31 +125,31 @@ func (m *Manager) Load() error {
 			}
 		}
 	}
-	
+
 	// 添加环境变量配置源
 	sources = append(sources, env.NewSource("KRATOS_"))
-	
+
 	// 创建配置
 	c := config.New(
 		config.WithSource(sources...),
 	)
-	
+
 	if err := c.Load(); err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
-	
+
 	m.config = c
-	
+
 	// 启动配置监听（如果支持）
 	m.startWatching()
-	
+
 	return nil
 }
 
 // Get 获取配置值
 func (m *Manager) Get(key string) config.Value {
 	if m.config == nil {
-		return config.Value{}
+		return nil
 	}
 	return m.config.Value(key)
 }
@@ -158,16 +158,16 @@ func (m *Manager) Get(key string) config.Value {
 func (m *Manager) Watch(key string, observer config.Observer) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	if m.watchers[key] == nil {
 		m.watchers[key] = make([]config.Observer, 0)
 	}
 	m.watchers[key] = append(m.watchers[key], observer)
-	
+
 	if m.config != nil {
 		return m.config.Watch(key, observer)
 	}
-	
+
 	return nil
 }
 
@@ -185,7 +185,7 @@ func (m *Manager) Validate() error {
 	if err := m.config.Scan(&cfg); err != nil {
 		return fmt.Errorf("failed to scan config: %w", err)
 	}
-	
+
 	return m.validator.Validate(&cfg)
 }
 
@@ -195,10 +195,10 @@ func (m *Manager) GetConfig() (*Config, error) {
 	if err := m.config.Scan(&cfg); err != nil {
 		return nil, fmt.Errorf("failed to scan config: %w", err)
 	}
-	
+
 	// 设置默认值
 	m.setDefaults(&cfg)
-	
+
 	return &cfg, nil
 }
 
@@ -258,7 +258,7 @@ func (m *Manager) startWatching() {
 	if m.configPath == "" {
 		return
 	}
-	
+
 	go func() {
 		watcher, err := fsnotify.NewWatcher()
 		if err != nil {
@@ -266,13 +266,13 @@ func (m *Manager) startWatching() {
 			return
 		}
 		defer watcher.Close()
-		
+
 		err = watcher.Add(m.configPath)
 		if err != nil {
 			m.logger.Log(log.LevelError, "msg", "Failed to watch config file", "file", m.configPath, "error", err)
 			return
 		}
-		
+
 		for {
 			select {
 			case event, ok := <-watcher.Events:
@@ -297,26 +297,27 @@ func (m *Manager) startWatching() {
 func (m *Manager) handleConfigChange() {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	// 重新加载配置
 	if err := m.config.Load(); err != nil {
 		m.logger.Log(log.LevelError, "msg", "Failed to reload config", "error", err)
 		return
 	}
-	
+
 	m.logger.Log(log.LevelInfo, "msg", "Config reloaded successfully")
 }
 
 // GetString 获取字符串配置
 func (m *Manager) GetString(key string, defaultValue ...string) string {
 	val := m.Get(key)
-	if val == nil || val.String() == "" {
+	strVal, err := val.String()
+	if err != nil || strVal == "" {
 		if len(defaultValue) > 0 {
 			return defaultValue[0]
 		}
 		return ""
 	}
-	return val.String()
+	return strVal
 }
 
 // GetInt 获取整数配置

@@ -19,25 +19,25 @@ import (
 // Logger 日志接口
 type Logger interface {
 	kratoslog.Logger
-	
+
 	// 结构化日志方法
 	Debug(msg string, fields ...Field)
 	Info(msg string, fields ...Field)
 	Warn(msg string, fields ...Field)
 	Error(msg string, fields ...Field)
 	Fatal(msg string, fields ...Field)
-	
+
 	// 格式化日志方法
 	Debugf(template string, args ...interface{})
 	Infof(template string, args ...interface{})
 	Warnf(template string, args ...interface{})
 	Errorf(template string, args ...interface{})
 	Fatalf(template string, args ...interface{})
-	
+
 	// 上下文方法
 	WithContext(ctx context.Context) Logger
 	WithFields(fields ...Field) Logger
-	
+
 	// 控制方法
 	Sync() error
 	Close() error
@@ -115,13 +115,13 @@ func Any(key string, val interface{}) Field {
 
 // Config 日志配置
 type Config struct {
-	Level         string      `yaml:"level" json:"level"`                   // 日志级别
-	Format        string      `yaml:"format" json:"format"`                 // 输出格式 (json/text)
-	Output        string      `yaml:"output" json:"output"`                 // 输出目标 (stdout/file)
-	File          FileConfig  `yaml:"file" json:"file"`                     // 文件配置
-	EnableCaller  bool        `yaml:"enable_caller" json:"enable_caller"`   // 是否显示调用位置
-	EnableTrace   bool        `yaml:"enable_trace" json:"enable_trace"`     // 是否启用链路追踪
-	SampleConfig  *SampleConfig `yaml:"sample" json:"sample"`               // 采样配置
+	Level        string        `yaml:"level" json:"level"`                 // 日志级别
+	Format       string        `yaml:"format" json:"format"`               // 输出格式 (json/text)
+	Output       string        `yaml:"output" json:"output"`               // 输出目标 (stdout/file)
+	File         FileConfig    `yaml:"file" json:"file"`                   // 文件配置
+	EnableCaller bool          `yaml:"enable_caller" json:"enable_caller"` // 是否显示调用位置
+	EnableTrace  bool          `yaml:"enable_trace" json:"enable_trace"`   // 是否启用链路追踪
+	SampleConfig *SampleConfig `yaml:"sample" json:"sample"`               // 采样配置
 }
 
 // FileConfig 文件日志配置
@@ -176,16 +176,16 @@ func NewLogger(config *Config) (Logger, error) {
 	if config == nil {
 		config = DefaultConfig()
 	}
-	
+
 	// 解析日志级别
 	level, err := parseLevel(config.Level)
 	if err != nil {
 		return nil, fmt.Errorf("invalid log level: %w", err)
 	}
-	
+
 	// 创建编码器配置
 	encoderConfig := getEncoderConfig(config.Format)
-	
+
 	// 创建编码器
 	var encoder zapcore.Encoder
 	if config.Format == "json" {
@@ -193,13 +193,13 @@ func NewLogger(config *Config) (Logger, error) {
 	} else {
 		encoder = zapcore.NewConsoleEncoder(encoderConfig)
 	}
-	
+
 	// 创建输出
 	writeSyncer := getWriteSyncer(config)
-	
+
 	// 创建核心
 	core := zapcore.NewCore(encoder, writeSyncer, level)
-	
+
 	// 应用采样（如果配置了）
 	if config.SampleConfig != nil {
 		core = zapcore.NewSamplerWithOptions(
@@ -209,20 +209,20 @@ func NewLogger(config *Config) (Logger, error) {
 			config.SampleConfig.Thereafter,
 		)
 	}
-	
+
 	// 创建zap logger
 	zapOpts := []zap.Option{
 		zap.ErrorOutput(zapcore.AddSync(os.Stderr)),
 	}
-	
+
 	if config.EnableCaller {
 		zapOpts = append(zapOpts, zap.AddCaller(), zap.AddCallerSkip(1))
 	}
-	
-	zapLogger := zap.New(core, zapOpts...)
-	
+
+	zapLog := zap.New(core, zapOpts...)
+
 	return &zapLogger{
-		zap:    zapLogger,
+		zap:    zapLog,
 		level:  level,
 		config: config,
 	}, nil
@@ -245,11 +245,11 @@ func (l *zapLogger) Log(level kratoslog.Level, keyvals ...interface{}) error {
 	default:
 		zapLevel = zapcore.InfoLevel
 	}
-	
+
 	if !l.zap.Core().Enabled(zapLevel) {
 		return nil
 	}
-	
+
 	fields := make([]zap.Field, 0, len(keyvals)/2)
 	for i := 0; i < len(keyvals); i += 2 {
 		if i+1 < len(keyvals) {
@@ -258,7 +258,7 @@ func (l *zapLogger) Log(level kratoslog.Level, keyvals ...interface{}) error {
 			fields = append(fields, zap.Any(key, value))
 		}
 	}
-	
+
 	switch zapLevel {
 	case zapcore.DebugLevel:
 		l.zap.Debug("", fields...)
@@ -271,7 +271,7 @@ func (l *zapLogger) Log(level kratoslog.Level, keyvals ...interface{}) error {
 	case zapcore.FatalLevel:
 		l.zap.Fatal("", fields...)
 	}
-	
+
 	return nil
 }
 
@@ -347,7 +347,7 @@ func (l *zapLogger) WithContext(ctx context.Context) Logger {
 	if len(fields) == 0 {
 		return l
 	}
-	
+
 	newZap := l.zap.With(l.fieldsToZapFields(fields...)...)
 	return &zapLogger{
 		zap:    newZap,
@@ -361,7 +361,7 @@ func (l *zapLogger) WithFields(fields ...Field) Logger {
 	if len(fields) == 0 {
 		return l
 	}
-	
+
 	newZap := l.zap.With(l.fieldsToZapFields(fields...)...)
 	return &zapLogger{
 		zap:    newZap,
@@ -383,10 +383,10 @@ func (l *zapLogger) Close() error {
 // fieldsToZapFields 转换字段到zap字段
 func (l *zapLogger) fieldsToZapFields(fields ...Field) []zap.Field {
 	zapFields := make([]zap.Field, 0, len(fields))
-	
+
 	for _, field := range fields {
 		var zapField zap.Field
-		
+
 		switch field.Type() {
 		case StringType:
 			zapField = zap.String(field.Key(), field.Value().(string))
@@ -413,10 +413,10 @@ func (l *zapLogger) fieldsToZapFields(fields ...Field) []zap.Field {
 		default:
 			zapField = zap.Any(field.Key(), field.Value())
 		}
-		
+
 		zapFields = append(zapFields, zapField)
 	}
-	
+
 	return zapFields
 }
 
@@ -454,24 +454,24 @@ func getEncoderConfig(format string) zapcore.EncoderConfig {
 		EncodeDuration: zapcore.StringDurationEncoder,
 		EncodeCaller:   zapcore.ShortCallerEncoder,
 	}
-	
+
 	if format == "text" {
 		config.EncodeLevel = zapcore.CapitalColorLevelEncoder
 		config.EncodeTime = zapcore.TimeEncoderOfLayout("2006-01-02 15:04:05")
 	}
-	
+
 	return config
 }
 
 // getWriteSyncer 获取写入器
 func getWriteSyncer(config *Config) zapcore.WriteSyncer {
 	var writers []io.Writer
-	
+
 	// 添加标准输出
 	if config.Output == "stdout" || config.Output == "both" {
 		writers = append(writers, os.Stdout)
 	}
-	
+
 	// 添加文件输出
 	if config.Output == "file" || config.Output == "both" {
 		// 确保日志目录存在
@@ -487,38 +487,38 @@ func getWriteSyncer(config *Config) zapcore.WriteSyncer {
 			writers = append(writers, fileWriter)
 		}
 	}
-	
+
 	if len(writers) == 0 {
 		writers = append(writers, os.Stdout)
 	}
-	
+
 	return zapcore.AddSync(io.MultiWriter(writers...))
 }
 
 // extractContextFields 从上下文提取字段
 func extractContextFields(ctx context.Context) []Field {
 	var fields []Field
-	
+
 	// 提取trace_id
 	if traceID := getTraceIDFromContext(ctx); traceID != "" {
 		fields = append(fields, String("trace_id", traceID))
 	}
-	
+
 	// 提取span_id
 	if spanID := getSpanIDFromContext(ctx); spanID != "" {
 		fields = append(fields, String("span_id", spanID))
 	}
-	
+
 	// 提取user_id
 	if userID := getUserIDFromContext(ctx); userID != "" {
 		fields = append(fields, String("user_id", userID))
 	}
-	
+
 	// 提取request_id
 	if requestID := getRequestIDFromContext(ctx); requestID != "" {
 		fields = append(fields, String("request_id", requestID))
 	}
-	
+
 	return fields
 }
 

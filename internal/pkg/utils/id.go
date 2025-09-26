@@ -66,7 +66,7 @@ func (g *generator) GenerateCustomID(prefix string, length int) string {
 	if length <= len(prefix) {
 		length = len(prefix) + 8
 	}
-	
+
 	// 生成随机字符串
 	randomPart := g.generateRandomString(length - len(prefix))
 	return prefix + randomPart
@@ -76,12 +76,12 @@ func (g *generator) GenerateCustomID(prefix string, length int) string {
 func (g *generator) generateRandomString(length int) string {
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	result := make([]byte, length)
-	
+
 	for i := range result {
 		num, _ := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
 		result[i] = charset[num.Int64()]
 	}
-	
+
 	return string(result)
 }
 
@@ -100,15 +100,15 @@ const (
 	machineIDBits = 10
 	// 序列号位数
 	sequenceBits = 12
-	
+
 	// 最大值
 	maxMachineID = -1 ^ (-1 << machineIDBits)
 	maxSequence  = -1 ^ (-1 << sequenceBits)
-	
+
 	// 位移
 	machineIDShift = sequenceBits
 	timestampShift = sequenceBits + machineIDBits
-	
+
 	// 基准时间戳 (2021-01-01 00:00:00 UTC)
 	epoch = 1609459200000
 )
@@ -118,7 +118,7 @@ func NewSnowflakeGenerator(machineID int64) *SnowflakeGenerator {
 	if machineID < 0 || machineID > maxMachineID {
 		panic(fmt.Sprintf("machine ID must be between 0 and %d", maxMachineID))
 	}
-	
+
 	return &SnowflakeGenerator{
 		machineID: machineID,
 		sequence:  0,
@@ -130,13 +130,13 @@ func NewSnowflakeGenerator(machineID int64) *SnowflakeGenerator {
 func (sf *SnowflakeGenerator) Generate() int64 {
 	sf.mutex.Lock()
 	defer sf.mutex.Unlock()
-	
+
 	now := time.Now().UnixMilli()
-	
+
 	if now < sf.timestamp {
 		panic("clock moved backwards")
 	}
-	
+
 	if now == sf.timestamp {
 		sf.sequence = (sf.sequence + 1) & maxSequence
 		if sf.sequence == 0 {
@@ -148,9 +148,9 @@ func (sf *SnowflakeGenerator) Generate() int64 {
 	} else {
 		sf.sequence = 0
 	}
-	
+
 	sf.timestamp = now
-	
+
 	return ((now - epoch) << timestampShift) |
 		(sf.machineID << machineIDShift) |
 		sf.sequence
@@ -214,7 +214,7 @@ func (t *TraceIDGenerator) GenerateSpanID() string {
 		// 如果随机数生成失败，使用时间戳作为后备
 		now := time.Now()
 		timestamp := now.UnixNano()
-		return fmt.Sprintf("%016x", timestamp&0xFFFFFFFFFFFFFFFF)
+		return fmt.Sprintf("%016x", timestamp&0x7FFFFFFFFFFFFFFF)
 	}
 	return hex.EncodeToString(bytes)
 }
@@ -255,7 +255,7 @@ func NewOperationIDGenerator() *OperationIDGenerator {
 func (o *OperationIDGenerator) Generate(operation string) string {
 	timestamp := time.Now().Unix()
 	snowflake := o.gen.GenerateSnowflake()
-	
+
 	// 组合操作名称、时间戳和雪花ID
 	combined := fmt.Sprintf("%s_%d_%d", operation, timestamp, snowflake)
 	hash := sha256.Sum256([]byte(combined))
@@ -296,7 +296,7 @@ func (m *IDManager) GenerateID(generatorName, idType string, params ...interface
 	if !exists {
 		return "", fmt.Errorf("generator %s not found", generatorName)
 	}
-	
+
 	switch idType {
 	case "uuid":
 		return gen.GenerateUUID(), nil
@@ -413,24 +413,24 @@ func (v *IDValidator) ValidateSnowflake(id int64) bool {
 	if id <= 0 {
 		return false
 	}
-	
+
 	timestamp, machineID, sequence := ParseSnowflake(id)
-	
+
 	// 验证时间戳是否合理（不能是未来时间）
 	if timestamp > time.Now().UnixMilli() {
 		return false
 	}
-	
+
 	// 验证机器ID是否在有效范围内
 	if machineID < 0 || machineID > maxMachineID {
 		return false
 	}
-	
+
 	// 验证序列号是否在有效范围内
 	if sequence < 0 || sequence > maxSequence {
 		return false
 	}
-	
+
 	return true
 }
 
@@ -439,11 +439,11 @@ func (v *IDValidator) ValidateCustomID(id, expectedPrefix string, expectedLength
 	if len(id) != expectedLength {
 		return false
 	}
-	
+
 	if expectedPrefix != "" && !startsWith(id, expectedPrefix) {
 		return false
 	}
-	
+
 	return true
 }
 
@@ -455,7 +455,7 @@ func startsWith(s, prefix string) bool {
 // IDMetrics ID指标收集器
 type IDMetrics struct {
 	generateCount map[string]int64
-	mu           sync.RWMutex
+	mu            sync.RWMutex
 }
 
 // NewIDMetrics 创建ID指标收集器

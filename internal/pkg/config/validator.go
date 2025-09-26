@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-playground/validator/v10"
+	validator "github.com/go-playground/validator/v10"
 )
 
 // Validator 配置验证器接口
@@ -15,8 +15,8 @@ type Validator interface {
 	RegisterCustomValidator(tag string, fn validator.Func) error
 }
 
-// validator 配置验证器实现
-type validator struct {
+// configValidator 配置验证器实现
+type configValidator struct {
 	validate *validator.Validate
 }
 
@@ -25,14 +25,14 @@ func NewValidator() Validator {
 	v := validator.New()
 
 	// 注册自定义验证器
-	customValidator := &validator{validate: v}
+	customValidator := &configValidator{validate: v}
 	customValidator.registerCustomValidators()
 
 	return customValidator
 }
 
 // Validate 验证配置
-func (v *validator) Validate(config interface{}) error {
+func (v *configValidator) Validate(config interface{}) error {
 	if err := v.validate.Struct(config); err != nil {
 		return v.formatValidationError(err)
 	}
@@ -40,12 +40,12 @@ func (v *validator) Validate(config interface{}) error {
 }
 
 // RegisterCustomValidator 注册自定义验证器
-func (v *validator) RegisterCustomValidator(tag string, fn validator.Func) error {
+func (v *configValidator) RegisterCustomValidator(tag string, fn validator.Func) error {
 	return v.validate.RegisterValidation(tag, fn)
 }
 
 // registerCustomValidators 注册自定义验证器
-func (v *validator) registerCustomValidators() {
+func (v *configValidator) registerCustomValidators() {
 	// 注册时间间隔验证器
 	v.validate.RegisterValidation("duration", func(fl validator.FieldLevel) bool {
 		field := fl.Field()
@@ -129,7 +129,7 @@ func (v *validator) registerCustomValidators() {
 }
 
 // formatValidationError 格式化验证错误
-func (v *validator) formatValidationError(err error) error {
+func (v *configValidator) formatValidationError(err error) error {
 	if validationErrors, ok := err.(validator.ValidationErrors); ok {
 		var messages []string
 
@@ -145,7 +145,7 @@ func (v *validator) formatValidationError(err error) error {
 }
 
 // getErrorMessage 获取错误消息
-func (v *validator) getErrorMessage(fieldError validator.FieldError) string {
+func (v *configValidator) getErrorMessage(fieldError validator.FieldError) string {
 	field := fieldError.Field()
 	tag := fieldError.Tag()
 	param := fieldError.Param()

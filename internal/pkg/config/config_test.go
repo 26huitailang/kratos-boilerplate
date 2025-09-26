@@ -5,15 +5,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-kratos/kratos/v2/config"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestNewManager(t *testing.T) {
 	logger := log.NewStdLogger(nil)
 	manager := NewManager("test.yaml", "dev", logger)
-	
+
 	assert.NotNil(t, manager)
 	assert.Equal(t, "test.yaml", manager.configPath)
 	assert.Equal(t, "dev", manager.environment)
@@ -26,7 +26,7 @@ func TestManagerWithInMemoryConfig(t *testing.T) {
 	// 创建一个内存中的配置管理器用于测试
 	logger := log.NewStdLogger(nil)
 	manager := NewManager("", "", logger)
-	
+
 	// 测试默认值方法
 	assert.Equal(t, "", manager.GetString("nonexistent"))
 	assert.Equal(t, "default", manager.GetString("nonexistent", "default"))
@@ -41,10 +41,10 @@ func TestManagerWithInMemoryConfig(t *testing.T) {
 func TestConfigDefaults(t *testing.T) {
 	logger := log.NewStdLogger(nil)
 	manager := NewManager("", "", logger)
-	
+
 	// 创建一个基本配置用于测试默认值设置
 	cfg := &Config{}
-	
+
 	// 设置必需的字段以通过验证
 	cfg.Server.HTTP.Addr = "0.0.0.0:8000"
 	cfg.Server.GRPC.Addr = "0.0.0.0:9000"
@@ -52,9 +52,9 @@ func TestConfigDefaults(t *testing.T) {
 	cfg.Data.Database.Source = "test://test"
 	cfg.Data.Redis.Addr = "127.0.0.1:6379"
 	cfg.Auth.JWTSecretKey = "test-secret-key-16-chars"
-	
+
 	manager.setDefaults(cfg)
-	
+
 	// 验证默认值
 	assert.Equal(t, 30*time.Second, cfg.Server.HTTP.Timeout)
 	assert.Equal(t, 30*time.Second, cfg.Server.GRPC.Timeout)
@@ -74,7 +74,7 @@ func TestConfigDefaults(t *testing.T) {
 func TestGetEnvConfigPath(t *testing.T) {
 	logger := log.NewStdLogger(nil)
 	manager := NewManager("", "", logger)
-	
+
 	tests := []struct {
 		name        string
 		configPath  string
@@ -100,7 +100,7 @@ func TestGetEnvConfigPath(t *testing.T) {
 			expected:    "/path/to/config.test",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := manager.getEnvConfigPath(tt.configPath, tt.environment)
@@ -112,7 +112,7 @@ func TestGetEnvConfigPath(t *testing.T) {
 func TestManagerClose(t *testing.T) {
 	logger := log.NewStdLogger(nil)
 	manager := NewManager("", "", logger)
-	
+
 	// 测试没有配置时的关闭
 	err := manager.Close()
 	assert.NoError(t, err)
@@ -121,22 +121,21 @@ func TestManagerClose(t *testing.T) {
 func TestConfigWatch(t *testing.T) {
 	logger := log.NewStdLogger(nil)
 	manager := NewManager("", "", logger)
-	
+
 	// 创建一个简单的观察者
-	observerCalled := false
-	observer := func(key string, value interface{}) {
-		observerCalled = true
-	}
-	
+	observer := config.Observer(func(key string, value config.Value) {
+		// 观察者回调函数
+	})
+
 	// 测试在没有配置的情况下添加观察者
 	err := manager.Watch("test.key", observer)
 	assert.NoError(t, err)
-	
+
 	// 验证观察者被添加到内部映射
 	manager.mu.RLock()
 	watchers := manager.watchers["test.key"]
 	manager.mu.RUnlock()
-	
+
 	assert.Len(t, watchers, 1)
 }
 
@@ -150,7 +149,7 @@ type MockConfig struct {
 
 func TestConfigValidation(t *testing.T) {
 	validator := NewValidator()
-	
+
 	tests := []struct {
 		name        string
 		config      MockConfig
@@ -186,7 +185,7 @@ func TestConfigValidation(t *testing.T) {
 			expectError: true,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := validator.Validate(&tt.config)
@@ -202,17 +201,17 @@ func TestConfigValidation(t *testing.T) {
 func TestManagerHelperMethods(t *testing.T) {
 	logger := log.NewStdLogger(nil)
 	manager := NewManager("", "", logger)
-	
+
 	// 由于没有实际的配置源，这些方法应该返回默认值
 	assert.Equal(t, "", manager.GetString("test.key"))
 	assert.Equal(t, "default", manager.GetString("test.key", "default"))
-	
+
 	assert.Equal(t, 0, manager.GetInt("test.key"))
 	assert.Equal(t, 42, manager.GetInt("test.key", 42))
-	
+
 	assert.Equal(t, false, manager.GetBool("test.key"))
 	assert.Equal(t, true, manager.GetBool("test.key", true))
-	
+
 	assert.Equal(t, time.Duration(0), manager.GetDuration("test.key"))
 	assert.Equal(t, time.Hour, manager.GetDuration("test.key", time.Hour))
 }
@@ -221,27 +220,27 @@ func TestManagerHelperMethods(t *testing.T) {
 func BenchmarkManagerHelperMethods(b *testing.B) {
 	logger := log.NewStdLogger(nil)
 	manager := NewManager("", "", logger)
-	
+
 	b.ResetTimer()
-	
+
 	b.Run("GetString", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			manager.GetString("test.key", "default")
 		}
 	})
-	
+
 	b.Run("GetInt", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			manager.GetInt("test.key", 42)
 		}
 	})
-	
+
 	b.Run("GetBool", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			manager.GetBool("test.key", true)
 		}
 	})
-	
+
 	b.Run("GetDuration", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			manager.GetDuration("test.key", time.Hour)
@@ -253,25 +252,25 @@ func BenchmarkManagerHelperMethods(b *testing.B) {
 func TestConfigConcurrency(t *testing.T) {
 	logger := log.NewStdLogger(nil)
 	manager := NewManager("", "", logger)
-	
+
 	// 并发测试观察者添加
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	
+
 	done := make(chan bool, 100)
-	
+
 	// 启动多个goroutine同时添加观察者
 	for i := 0; i < 100; i++ {
 		go func(id int) {
-			observer := func(key string, value interface{}) {
+			observer := config.Observer(func(key string, value config.Value) {
 				// 简单的观察者函数
-			}
+			})
 			err := manager.Watch("test.key", observer)
 			assert.NoError(t, err)
 			done <- true
 		}(i)
 	}
-	
+
 	// 等待所有goroutine完成
 	for i := 0; i < 100; i++ {
 		select {
@@ -281,11 +280,11 @@ func TestConfigConcurrency(t *testing.T) {
 			t.Fatal("Test timed out")
 		}
 	}
-	
+
 	// 验证观察者数量
 	manager.mu.RLock()
 	watchers := manager.watchers["test.key"]
 	manager.mu.RUnlock()
-	
+
 	assert.Len(t, watchers, 100)
 }
