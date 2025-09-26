@@ -123,6 +123,13 @@ logcheck-install:
 	@cd tools/logchecker && go build -o $(GOPATH)/bin/logchecker .
 	@echo "Log checker installed to $(GOPATH)/bin/logchecker"
 
+.PHONY: archive
+# create source code archive
+archive:
+	@echo "Creating source code archive..."
+	git archive --format=tar.gz --prefix=kratos-boilerplate-$(VERSION)/ HEAD -o kratos-boilerplate-$(VERSION).tar.gz
+	@echo "Archive created: kratos-boilerplate-$(VERSION).tar.gz"
+
 # show help
 help:
 	@echo ''
