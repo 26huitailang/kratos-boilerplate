@@ -310,6 +310,12 @@ func (m *Manager) handleConfigChange() {
 // GetString 获取字符串配置
 func (m *Manager) GetString(key string, defaultValue ...string) string {
 	val := m.Get(key)
+	if val == nil {
+		if len(defaultValue) > 0 {
+			return defaultValue[0]
+		}
+		return ""
+	}
 	strVal, err := val.String()
 	if err != nil || strVal == "" {
 		if len(defaultValue) > 0 {

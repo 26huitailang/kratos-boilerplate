@@ -16,44 +16,44 @@ type ErrorCode int
 // 错误码定义
 const (
 	// 系统错误 10000-19999
-	ErrCodeInternalError     ErrorCode = 10000
+	ErrCodeInternalError      ErrorCode = 10000
 	ErrCodeServiceUnavailable ErrorCode = 10001
-	ErrCodeTimeout           ErrorCode = 10002
-	ErrCodeDatabaseError     ErrorCode = 10003
-	ErrCodeCacheError        ErrorCode = 10004
-	ErrCodeConfigError       ErrorCode = 10005
-	
+	ErrCodeTimeout            ErrorCode = 10002
+	ErrCodeDatabaseError      ErrorCode = 10003
+	ErrCodeCacheError         ErrorCode = 10004
+	ErrCodeConfigError        ErrorCode = 10005
+
 	// 参数错误 20000-29999
-	ErrCodeInvalidParams     ErrorCode = 20000
-	ErrCodeMissingParams     ErrorCode = 20001
-	ErrCodeInvalidFormat     ErrorCode = 20002
-	ErrCodeInvalidRange      ErrorCode = 20003
-	ErrCodeDuplicateValue    ErrorCode = 20004
-	ErrCodeInvalidOperation  ErrorCode = 20005
-	
+	ErrCodeInvalidParams    ErrorCode = 20000
+	ErrCodeMissingParams    ErrorCode = 20001
+	ErrCodeInvalidFormat    ErrorCode = 20002
+	ErrCodeInvalidRange     ErrorCode = 20003
+	ErrCodeDuplicateValue   ErrorCode = 20004
+	ErrCodeInvalidOperation ErrorCode = 20005
+
 	// 认证错误 30000-39999
-	ErrCodeUnauthorized      ErrorCode = 30000
-	ErrCodeInvalidToken      ErrorCode = 30001
-	ErrCodeTokenExpired      ErrorCode = 30002
-	ErrCodePermissionDenied  ErrorCode = 30003
-	ErrCodeAccountLocked     ErrorCode = 30004
+	ErrCodeUnauthorized       ErrorCode = 30000
+	ErrCodeInvalidToken       ErrorCode = 30001
+	ErrCodeTokenExpired       ErrorCode = 30002
+	ErrCodePermissionDenied   ErrorCode = 30003
+	ErrCodeAccountLocked      ErrorCode = 30004
 	ErrCodeInvalidCredentials ErrorCode = 30005
-	
+
 	// 业务错误 40000-49999
-	ErrCodeResourceNotFound  ErrorCode = 40000
-	ErrCodeResourceExists    ErrorCode = 40001
-	ErrCodeOperationFailed   ErrorCode = 40002
-	ErrCodeBusinessLogic     ErrorCode = 40003
-	ErrCodeQuotaExceeded     ErrorCode = 40004
-	ErrCodeWorkflowError     ErrorCode = 40005
-	
+	ErrCodeResourceNotFound ErrorCode = 40000
+	ErrCodeResourceExists   ErrorCode = 40001
+	ErrCodeOperationFailed  ErrorCode = 40002
+	ErrCodeBusinessLogic    ErrorCode = 40003
+	ErrCodeQuotaExceeded    ErrorCode = 40004
+	ErrCodeWorkflowError    ErrorCode = 40005
+
 	// 外部错误 50000-59999
-	ErrCodeExternalService   ErrorCode = 50000
-	ErrCodeThirdPartyAPI     ErrorCode = 50001
-	ErrCodeNetworkError      ErrorCode = 50002
-	ErrCodeUpstreamError     ErrorCode = 50003
-	ErrCodeIntegrationError  ErrorCode = 50004
-	ErrCodeWebhookError      ErrorCode = 50005
+	ErrCodeExternalService  ErrorCode = 50000
+	ErrCodeThirdPartyAPI    ErrorCode = 50001
+	ErrCodeNetworkError     ErrorCode = 50002
+	ErrCodeUpstreamError    ErrorCode = 50003
+	ErrCodeIntegrationError ErrorCode = 50004
+	ErrCodeWebhookError     ErrorCode = 50005
 )
 
 // BaseError 基础错误结构
@@ -97,6 +97,13 @@ func (e *BaseError) ToJSON() ([]byte, error) {
 // WithCause 添加原因错误
 func (e *BaseError) WithCause(cause error) *BaseError {
 	newErr := *e
+	// 必须复制Details map避免共享
+	if e.Details != nil {
+		newErr.Details = make(map[string]interface{})
+		for k, v := range e.Details {
+			newErr.Details[k] = v
+		}
+	}
 	newErr.Cause = cause
 	return &newErr
 }
@@ -104,8 +111,12 @@ func (e *BaseError) WithCause(cause error) *BaseError {
 // WithDetail 添加详细信息
 func (e *BaseError) WithDetail(key string, value interface{}) *BaseError {
 	newErr := *e
-	if newErr.Details == nil {
-		newErr.Details = make(map[string]interface{})
+	// 必须复制Details map避免共享
+	newErr.Details = make(map[string]interface{})
+	if e.Details != nil {
+		for k, v := range e.Details {
+			newErr.Details[k] = v
+		}
 	}
 	newErr.Details[key] = value
 	return &newErr
@@ -151,12 +162,12 @@ func WrapError(err error, code ErrorCode, message string) *BaseError {
 	if err == nil {
 		return nil
 	}
-	
+
 	// 如果已经是BaseError，更新信息
 	if baseErr, ok := err.(*BaseError); ok {
 		return baseErr.WithCause(err)
 	}
-	
+
 	return NewErrorWithCause(code, message, err)
 }
 
@@ -334,7 +345,7 @@ func (ec *ErrorCollector) Add(err error) {
 	if err == nil {
 		return
 	}
-	
+
 	if baseErr, ok := err.(*BaseError); ok {
 		ec.errors = append(ec.errors, baseErr)
 	} else {
@@ -365,11 +376,11 @@ func (ec *ErrorCollector) Error() string {
 	if len(ec.errors) == 0 {
 		return ""
 	}
-	
+
 	if len(ec.errors) == 1 {
 		return ec.errors[0].Error()
 	}
-	
+
 	return fmt.Sprintf("multiple errors (%d): %s", len(ec.errors), ec.errors[0].Error())
 }
 
@@ -378,7 +389,7 @@ func (ec *ErrorCollector) ToMultiError() *MultiError {
 	if len(ec.errors) == 0 {
 		return nil
 	}
-	
+
 	return &MultiError{
 		Errors: ec.errors,
 		Count:  len(ec.errors),
@@ -396,11 +407,11 @@ func (me *MultiError) Error() string {
 	if me.Count == 0 {
 		return ""
 	}
-	
+
 	if me.Count == 1 {
 		return me.Errors[0].Error()
 	}
-	
+
 	return fmt.Sprintf("multiple errors (%d): %s", me.Count, me.Errors[0].Error())
 }
 
@@ -445,18 +456,18 @@ func (m *DefaultErrorMiddleware) HandleError(err error) *BaseError {
 	if err == nil {
 		return nil
 	}
-	
+
 	// 如果已经是BaseError，直接返回
 	if baseErr, ok := err.(*BaseError); ok {
 		return baseErr
 	}
-	
+
 	// 如果是Kratos错误，转换格式
 	if kratosErr := errors.FromError(err); kratosErr != nil {
 		code := parseKratosErrorCode(kratosErr.Code)
 		return NewError(code, kratosErr.Message).WithDetail("reason", kratosErr.Reason)
 	}
-	
+
 	// 其他错误包装为内部错误
 	return InternalError(err.Error()).WithCause(err)
 }
@@ -494,7 +505,7 @@ func ToKratosError(err *BaseError) *errors.Error {
 	if err == nil {
 		return nil
 	}
-	
+
 	return errors.New(int(err.HTTPStatus), strconv.Itoa(int(err.Code)), err.Message)
 }
 
@@ -503,7 +514,7 @@ func FromKratosError(err *errors.Error) *BaseError {
 	if err == nil {
 		return nil
 	}
-	
+
 	code := parseKratosErrorCode(err.Code)
 	return NewError(code, err.Message).WithDetail("reason", err.Reason)
 }
