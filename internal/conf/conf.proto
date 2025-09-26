@@ -9,7 +9,6 @@ message Bootstrap {
   Server server = 1;
   Data data = 2;
   Auth auth = 3;
-  Features features = 4;
 }
 
 message Server {
@@ -51,19 +50,4 @@ message Auth {
   int32 max_login_attempts = 6;
   google.protobuf.Duration lock_duration = 7;
   bool totp_enabled = 8;
-}
-
-message Features {
-  bool enabled = 1;
-  string config_file = 2;
-  string config_format = 3;
-  bool watch_config = 4;
-  string default_environment = 5;
-  FeatureRepository repository = 6;
-}
-
-message FeatureRepository {
-  string type = 1;  // "file", "redis", "database"
-  string config_path = 2;
-  string format = 3;  // "yaml", "json"
 }

@@ -3,7 +3,6 @@
 <cite>
 **本文档引用的文件**
 - [api/auth/v1/auth.proto](file://api/auth/v1/auth.proto)
-- [api/feature/v1/feature.proto](file://api/feature/v1/feature.proto)
 - [api/helloworld/v1/greeter.proto](file://api/helloworld/v1/greeter.proto)
 - [api/common/v1/error.proto](file://api/common/v1/error.proto)
 - [frontend/src/api/auth.ts](file://frontend/src/api/auth.ts)
@@ -34,7 +33,6 @@
 
 项目包含三个主要的API服务组：
 - **认证服务** (`auth.v1`) - 用户认证、注册、令牌管理
-- **功能开关服务** (`feature.v1`) - 功能开关的全生命周期管理
 - **问候服务** (`helloworld.v1`) - 基础的gRPC/HTTP示例
 
 ## 项目架构概览
@@ -53,7 +51,6 @@ Swagger[Swagger UI]
 end
 subgraph "业务逻辑层"
 AuthService[认证服务]
-FeatureService[功能开关服务]
 GreeterService[问候服务]
 end
 subgraph "数据层"
@@ -65,15 +62,12 @@ Web --> HTTP
 Mobile --> HTTP
 CLI --> HTTP
 HTTP --> AuthService
-HTTP --> FeatureService
 HTTP --> GreeterService
 GRPC --> AuthService
-GRPC --> FeatureService
 GRPC --> GreeterService
 AuthService --> Database
 AuthService --> Cache
 AuthService --> KMS
-FeatureService --> Database
 GreeterService --> Database
 Swagger --> HTTP
 ```
@@ -89,15 +83,15 @@ Swagger --> HTTP
 
 ### API端点概览
 
-| 方法 | HTTP方法 | URL路径 | 描述 |
-|------|----------|---------|------|
-| GetCaptcha | GET | `/api/v1/auth/captcha` | 获取验证码 |
-| VerifyCaptcha | POST | `/api/v1/auth/captcha/verify` | 验证验证码 |
-| Register | POST | `/api/v1/auth/register` | 用户注册 |
-| Login | POST | `/api/v1/auth/login` | 用户登录 |
-| Logout | POST | `/api/v1/auth/logout` | 退出登录 |
-| RefreshToken | POST | `/api/v1/auth/refresh` | 刷新令牌 |
-| LockStatus | GET | `/api/v1/auth/lock-status/{username}` | 查询账户锁定状态 |
+| 方法          | HTTP方法 | URL路径                               | 描述             |
+| ------------- | -------- | ------------------------------------- | ---------------- |
+| GetCaptcha    | GET      | `/api/v1/auth/captcha`                | 获取验证码       |
+| VerifyCaptcha | POST     | `/api/v1/auth/captcha/verify`         | 验证验证码       |
+| Register      | POST     | `/api/v1/auth/register`               | 用户注册         |
+| Login         | POST     | `/api/v1/auth/login`                  | 用户登录         |
+| Logout        | POST     | `/api/v1/auth/logout`                 | 退出登录         |
+| RefreshToken  | POST     | `/api/v1/auth/refresh`                | 刷新令牌         |
+| LockStatus    | GET      | `/api/v1/auth/lock-status/{username}` | 查询账户锁定状态 |
 
 ### GetCaptcha - 获取验证码
 
@@ -311,177 +305,6 @@ curl -X GET "http://localhost:8000/api/v1/auth/lock-status/john_doe" \
 - [api/auth/v1/auth.proto](file://api/auth/v1/auth.proto#L1-L235)
 - [frontend/src/api/auth.ts](file://frontend/src/api/auth.ts#L1-L99)
 
-## 功能开关服务API
-
-功能开关服务提供了功能开关的全生命周期管理，支持复杂的策略评估和多维度控制。
-
-### API端点概览
-
-| 方法 | HTTP方法 | URL路径 | 描述 |
-|------|----------|---------|------|
-| ListToggles | GET | `/api/v1/features` | 获取功能开关列表 |
-| GetToggle | GET | `/api/v1/features/{flag}` | 获取单个功能开关 |
-| UpdateToggle | PUT | `/api/v1/features/{flag}` | 更新功能开关 |
-| EnableToggle | POST | `/api/v1/features/{flag}/enable` | 启用功能开关 |
-| DisableToggle | POST | `/api/v1/features/{flag}/disable` | 禁用功能开关 |
-| DeleteToggle | DELETE | `/api/v1/features/{flag}` | 删除功能开关 |
-| EvaluateToggle | POST | `/api/v1/features/{flag}/evaluate` | 评估功能开关 |
-| GetStats | GET | `/api/v1/features/stats` | 获取功能开关统计 |
-
-### ListToggles - 获取功能开关列表
-
-**HTTP端点**: `GET /api/v1/features`
-
-**查询参数**:
-```typescript
-interface ListTogglesRequest {
-  page?: number;         // 页码，默认1
-  page_size?: number;    // 每页数量，默认20，最大1000
-  tags?: string[];       // 按标签过滤
-  enabled_only?: boolean;// 仅显示启用的开关
-}
-```
-
-**响应数据**:
-```typescript
-interface ListTogglesReply {
-  toggles: FeatureToggleInfo[];
-  total: number;         // 总数量
-  page: number;          // 当前页码
-  page_size: number;     // 每页大小
-}
-
-interface FeatureToggleInfo {
-  flag: string;          // 功能标识符
-  config: ToggleConfig;  // 功能配置
-}
-```
-
-**cURL示例**:
-```bash
-curl -X GET "http://localhost:8000/api/v1/features?page=1&page_size=20&tags=auth,user&enabled_only=true" \
-  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-```
-
-### GetToggle - 获取单个功能开关
-
-**HTTP端点**: `GET /api/v1/features/{flag}`
-
-**路径参数**:
-```typescript
-interface GetToggleRequest {
-  flag: string;          // 功能标识符
-}
-```
-
-**响应数据**:
-```typescript
-interface GetToggleReply {
-  toggle: FeatureToggleInfo;
-}
-```
-
-### UpdateToggle - 更新功能开关
-
-**HTTP端点**: `PUT /api/v1/features/{flag}`
-
-**请求体**:
-```typescript
-interface UpdateToggleRequest {
-  flag: string;
-  config: ToggleConfig;
-}
-
-interface ToggleConfig {
-  enabled: boolean;                    // 是否启用
-  strategy: FeatureStrategy;           // 策略类型
-  rules: Record<string, string>;       // 规则配置
-  description?: string;                // 描述
-  tags?: string[];                     // 标签
-}
-```
-
-### EvaluateToggle - 评估功能开关
-
-**HTTP端点**: `POST /api/v1/features/{flag}/evaluate`
-
-**请求体**:
-```typescript
-interface EvaluateToggleRequest {
-  flag: string;                        // 功能标识符
-  context: EvaluationContext;          // 评估上下文
-}
-
-interface EvaluationContext {
-  user_id?: string;                    // 用户ID
-  user_type?: string;                  // 用户类型
-  environment?: string;                // 环境（prod, dev, test）
-  version?: string;                    // 版本号
-  attributes?: Record<string, string>; // 自定义属性
-}
-```
-
-**响应数据**:
-```typescript
-interface EvaluateToggleReply {
-  enabled: boolean;                    // 是否启用
-  reason: string;                      // 评估原因
-}
-```
-
-**cURL示例**:
-```bash
-curl -X POST "http://localhost:8000/api/v1/features/user_management/evaluate" \
-  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
-  -H "Content-Type: application/json" \
-  -d '{
-    "context": {
-      "user_id": "user_123",
-      "user_type": "premium",
-      "environment": "prod",
-      "attributes": {
-        "country": "CN"
-      }
-    }
-  }'
-```
-
-### 功能策略类型
-
-系统支持五种功能策略：
-
-```mermaid
-flowchart TD
-Start([功能评估开始]) --> CheckStrategy{检查策略类型}
-CheckStrategy --> |SIMPLE| SimpleEval[简单策略<br/>仅根据enabled字段]
-CheckStrategy --> |PERCENTAGE| PercentageEval[百分比策略<br/>按设定百分比随机启用]
-CheckStrategy --> |USER| UserEval[用户策略<br/>根据用户类型/ID]
-CheckStrategy --> |TIME| TimeEval[时间策略<br/>根据时间范围]
-CheckStrategy --> |ENVIRONMENT| EnvEval[环境策略<br/>根据部署环境]
-SimpleEval --> SimpleResult{enabled字段值}
-SimpleResult --> |true| Enabled[功能启用]
-SimpleResult --> |false| Disabled[功能禁用]
-PercentageEval --> RandomCheck[生成随机数]
-RandomCheck --> PercentCheck{随机数 ≤ 百分比?}
-PercentCheck --> |是| Enabled
-PercentCheck --> |否| Disabled
-UserEval --> UserCheck{用户符合条件?}
-UserCheck --> |是| Enabled
-UserCheck --> |否| Disabled
-TimeEval --> TimeCheck{当前时间在范围内?}
-TimeCheck --> |是| Enabled
-TimeCheck --> |否| Disabled
-EnvEval --> EnvCheck{环境匹配?}
-EnvCheck --> |是| Enabled
-EnvCheck --> |否| Disabled
-```
-
-**图表来源**
-- [api/feature/v1/feature.proto](file://api/feature/v1/feature.proto#L80-L100)
-
-**章节来源**
-- [api/feature/v1/feature.proto](file://api/feature/v1/feature.proto#L1-L256)
-
 ## 问候服务API
 
 基础的gRPC/HTTP示例服务，演示了最简单的API设计模式。
@@ -567,13 +390,13 @@ ErrorResponse --> ErrorCode : "使用"
 
 ### 错误码分类
 
-| 错误码类别 | HTTP状态码 | 描述 |
-|------------|------------|------|
-| 请求参数错误 | 400 | 参数验证失败、缺失必要参数等 |
-| 认证授权错误 | 401/403 | 未授权访问、令牌无效、权限不足等 |
-| 资源错误 | 404/409 | 资源不存在、冲突等 |
-| 业务逻辑错误 | 422 | 账户锁定、功能禁用、配额超限等 |
-| 系统错误 | 500 | 内部服务器错误、服务不可用等 |
+| 错误码类别   | HTTP状态码 | 描述                             |
+| ------------ | ---------- | -------------------------------- |
+| 请求参数错误 | 400        | 参数验证失败、缺失必要参数等     |
+| 认证授权错误 | 401/403    | 未授权访问、令牌无效、权限不足等 |
+| 资源错误     | 404/409    | 资源不存在、冲突等               |
+| 业务逻辑错误 | 422        | 账户锁定、功能禁用、配额超限等   |
+| 系统错误     | 500        | 内部服务器错误、服务不可用等     |
 
 ### 错误处理示例
 
@@ -643,7 +466,6 @@ DB-->>Auth : 用户信息
 Auth->>Auth : 生成JWT令牌
 Auth-->>Client : {access_token, refresh_token, expires_in}
 Note over Client,DB : 5. 使用访问令牌
-Client->>Auth : GET /api/v1/features (带Bearer token)
 Auth->>Auth : 验证JWT令牌
 Auth-->>Client : 功能开关列表
 Note over Client,DB : 6. 刷新令牌
@@ -836,13 +658,12 @@ production:
 
 ### 常见错误及解决方案
 
-| 错误类型 | HTTP状态码 | 错误码 | 解决方案 |
-|----------|------------|--------|----------|
-| 验证码错误 | 400 | CAPTCHA_INVALID | 重新获取验证码 |
-| 令牌过期 | 401 | TOKEN_EXPIRED | 使用刷新令牌 |
-| 用户不存在 | 404 | USER_NOT_FOUND | 检查用户名 |
-| 权限不足 | 403 | FORBIDDEN | 检查用户权限 |
-| 功能禁用 | 422 | FEATURE_DISABLED | 联系管理员启用功能 |
+| 错误类型   | HTTP状态码 | 错误码          | 解决方案       |
+| ---------- | ---------- | --------------- | -------------- |
+| 验证码错误 | 400        | CAPTCHA_INVALID | 重新获取验证码 |
+| 令牌过期   | 401        | TOKEN_EXPIRED   | 使用刷新令牌   |
+| 用户不存在 | 404        | USER_NOT_FOUND  | 检查用户名     |
+| 权限不足   | 403        | FORBIDDEN       | 检查用户权限   |
 
 ### 调试技巧
 

@@ -33,15 +33,3 @@ plugins:
     sandbox_enabled: true
     max_memory: "100MB"
     max_cpu_percent: 10
-
-# 功能开关配置
-features:
-  enabled: true
-  config_file: "./configs/features.yaml"
-  config_format: "yaml"
-  watch_config: true
-  default_environment: "production"
-  repository:
-    type: "file"
-    config_path: "./configs/features.yaml"
-    format: "yaml"
