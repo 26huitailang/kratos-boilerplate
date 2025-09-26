@@ -465,7 +465,7 @@ func (m *DefaultErrorMiddleware) HandleError(err error) *BaseError {
 	// 如果是Kratos错误，转换格式
 	if kratosErr := errors.FromError(err); kratosErr != nil {
 		code := parseKratosErrorCode(kratosErr.Code)
-		return NewError(code, kratosErr.Message).WithDetail("reason", kratosErr.Reason)
+		return NewError(code, kratosErr.Message).WithDetail("reason", kratosErr.Reason).WithCause(err)
 	}
 
 	// 其他错误包装为内部错误
