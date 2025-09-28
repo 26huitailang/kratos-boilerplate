@@ -123,6 +123,17 @@ logcheck-install:
 	@cd tools/logchecker && go build -o $(GOPATH)/bin/logchecker .
 	@echo "Log checker installed to $(GOPATH)/bin/logchecker"
 
+.PHONY: clean
+# clean generated files
+clean:
+	@echo "Cleaning generated files..."
+	find . -name "*.pb.go" -type f -delete
+	find . -name "*_grpc.pb.go" -type f -delete
+	find . -name "*_http.pb.go" -type f -delete
+	find . -name "wire_gen.go" -type f -delete
+	rm -f openapi.yaml swagger.json
+	@echo "Generated files cleaned"
+
 .PHONY: archive
 # create source code archive
 archive:

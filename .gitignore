@@ -40,7 +40,13 @@ bin/
 # Generated files
 *.pb.go
 *.pb.validate.go
+*_grpc.pb.go
+*_http.pb.go
 openapi.yaml
+swagger.json
+
+# Wire generated files
+wire_gen.go
 
 # IDE specific files
 .idea
