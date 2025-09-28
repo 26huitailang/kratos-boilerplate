@@ -1,3 +1,7 @@
+# 开发环境配置文件
+# 此文件包含开发环境的默认配置
+# 不包含敏感信息，可以安全地提交到版本控制
+
 server:
   http:
     addr: 0.0.0.0:8000
@@ -8,14 +12,16 @@ server:
 data:
   database:
     driver: postgres
-    source: postgresql://postgres:postgres@cross-redline-db:5432/test?sslmode=disable
+    # 开发环境数据库连接
+    source: postgresql://postgres:postgres@localhost:5432/test_dev?sslmode=disable
   redis:
     addr: 127.0.0.1:6379
     read_timeout: 0.2s
     write_timeout: 0.2s
 
 auth:
-  jwt_secret_key: "your-super-secret-jwt-key-here"
+  # 开发环境JWT密钥 - 仅用于开发环境，生产环境必须使用强随机密钥
+  jwt_secret_key: "dev-jwt-secret-key-change-in-production"
   access_token_expiration: "24h"
   refresh_token_expiration: "7d"
   captcha_enabled: true

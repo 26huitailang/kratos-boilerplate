@@ -9,6 +9,9 @@ message Bootstrap {
   Server server = 1;
   Data data = 2;
   Auth auth = 3;
+  Log log = 4;
+  Security security = 5;
+  Monitoring monitoring = 6;
 }
 
 message Server {
@@ -30,12 +33,18 @@ message Data {
   message Database {
     string driver = 1;
     string source = 2;
+    int32 max_idle_conns = 3;
+    int32 max_open_conns = 4;
+    google.protobuf.Duration conn_max_lifetime = 5;
   }
   message Redis {
     string network = 1;
     string addr = 2;
-    google.protobuf.Duration read_timeout = 3;
-    google.protobuf.Duration write_timeout = 4;
+    string password = 3;
+    int32 db = 4;
+    google.protobuf.Duration read_timeout = 5;
+    google.protobuf.Duration write_timeout = 6;
+    int32 pool_size = 7;
   }
   Database database = 1;
   Redis redis = 2;
@@ -50,4 +59,59 @@ message Auth {
   int32 max_login_attempts = 6;
   google.protobuf.Duration lock_duration = 7;
   bool totp_enabled = 8;
+}
+
+message Log {
+  string level = 1;
+  string format = 2;
+  string output = 3;
+  message Rotation {
+    string max_size = 1;
+    string max_age = 2;
+    int32 max_backups = 3;
+  }
+  Rotation rotation = 4;
+}
+
+message Security {
+  message TLS {
+    bool enabled = 1;
+    string cert_file = 2;
+    string key_file = 3;
+  }
+  message CORS {
+    string allowed_origins = 1;
+    string allowed_methods = 2;
+    string allowed_headers = 3;
+    int32 max_age = 4;
+  }
+  message RateLimit {
+    bool enabled = 1;
+    int32 requests_per_minute = 2;
+    int32 burst = 3;
+  }
+  TLS tls = 1;
+  CORS cors = 2;
+  RateLimit rate_limit = 3;
+}
+
+message Monitoring {
+  message Metrics {
+    bool enabled = 1;
+    string addr = 2;
+    string path = 3;
+  }
+  message Health {
+    bool enabled = 1;
+    string addr = 2;
+    string path = 3;
+  }
+  message Tracing {
+    bool enabled = 1;
+    string endpoint = 2;
+    string service_name = 3;
+  }
+  Metrics metrics = 1;
+  Health health = 2;
+  Tracing tracing = 3;
 }

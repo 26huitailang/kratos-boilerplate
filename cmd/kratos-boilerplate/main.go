@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"kratos-boilerplate/internal/conf"
+	configValidator "kratos-boilerplate/internal/pkg/config"
 
 	"github.com/go-kratos/kratos/v2"
 	"github.com/go-kratos/kratos/v2/config"
@@ -76,6 +77,12 @@ func main() {
 	var bc conf.Bootstrap
 	if err := c.Scan(&bc); err != nil {
 		panic(err)
+	}
+
+	// Validate configuration
+	validator := configValidator.NewConfigValidator(&bc)
+	if err := validator.Validate(); err != nil {
+		log.Fatalf("Configuration validation failed: %v", err)
 	}
 
 	app, cleanup, err := wireApp(bc.Server, bc.Data, bc.Auth, &bc, logger)

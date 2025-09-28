@@ -2,320 +2,299 @@ package config
 
 import (
 	"fmt"
-	"reflect"
+	"net/url"
+	"os"
 	"strings"
-	"time"
 
-	validator "github.com/go-playground/validator/v10"
+	"kratos-boilerplate/internal/conf"
 )
 
-// Validator 配置验证器接口
+// Validator configuration validator interface
 type Validator interface {
 	Validate(config interface{}) error
-	RegisterCustomValidator(tag string, fn validator.Func) error
 }
 
-// configValidator 配置验证器实现
-type configValidator struct {
-	validate *validator.Validate
-}
+// DefaultValidator default configuration validator
+type DefaultValidator struct{}
 
-// NewValidator 创建配置验证器
+// NewValidator creates default configuration validator
 func NewValidator() Validator {
-	v := validator.New()
-
-	// 注册自定义验证器
-	customValidator := &configValidator{validate: v}
-	customValidator.registerCustomValidators()
-
-	return customValidator
+	return &DefaultValidator{}
 }
 
-// Validate 验证配置
-func (v *configValidator) Validate(config interface{}) error {
-	if err := v.validate.Struct(config); err != nil {
-		return v.formatValidationError(err)
-	}
+// Validate validates configuration
+func (v *DefaultValidator) Validate(config interface{}) error {
+	// Here you can implement generic configuration validation logic
+	// Currently returns nil, specific validation logic is implemented by individual validators
 	return nil
 }
 
-// RegisterCustomValidator 注册自定义验证器
-func (v *configValidator) RegisterCustomValidator(tag string, fn validator.Func) error {
-	return v.validate.RegisterValidation(tag, fn)
-}
-
-// registerCustomValidators 注册自定义验证器
-func (v *configValidator) registerCustomValidators() {
-	// 注册时间间隔验证器
-	v.validate.RegisterValidation("duration", func(fl validator.FieldLevel) bool {
-		field := fl.Field()
-		if field.Kind() != reflect.String {
-			return true // 不是字符串类型，跳过验证
-		}
-
-		durationStr := field.String()
-		if durationStr == "" {
-			return true // 空值跳过验证
-		}
-
-		_, err := time.ParseDuration(durationStr)
-		return err == nil
-	})
-
-	// 注册端口验证器
-	v.validate.RegisterValidation("port", func(fl validator.FieldLevel) bool {
-		field := fl.Field()
-		if field.Kind() != reflect.String {
-			return true
-		}
-
-		addr := field.String()
-		if addr == "" {
-			return true
-		}
-
-		// 简单的端口格式验证
-		parts := strings.Split(addr, ":")
-		if len(parts) != 2 {
-			return false
-		}
-
-		// 检查端口是否为数字且在有效范围内
-		port := parts[1]
-		if port == "" {
-			return false
-		}
-
-		return true
-	})
-
-	// 注册数据库驱动验证器
-	v.validate.RegisterValidation("db_driver", func(fl validator.FieldLevel) bool {
-		field := fl.Field()
-		if field.Kind() != reflect.String {
-			return true
-		}
-
-		driver := field.String()
-		validDrivers := []string{"postgres", "mysql", "sqlite", "sqlserver"}
-
-		for _, validDriver := range validDrivers {
-			if driver == validDriver {
-				return true
-			}
-		}
-
-		return false
-	})
-
-	// 注册日志级别验证器
-	v.validate.RegisterValidation("log_level", func(fl validator.FieldLevel) bool {
-		field := fl.Field()
-		if field.Kind() != reflect.String {
-			return true
-		}
-
-		level := field.String()
-		validLevels := []string{"debug", "info", "warn", "error", "fatal"}
-
-		for _, validLevel := range validLevels {
-			if strings.ToLower(level) == validLevel {
-				return true
-			}
-		}
-
-		return false
-	})
-}
-
-// formatValidationError 格式化验证错误
-func (v *configValidator) formatValidationError(err error) error {
-	if validationErrors, ok := err.(validator.ValidationErrors); ok {
-		var messages []string
-
-		for _, fieldError := range validationErrors {
-			message := v.getErrorMessage(fieldError)
-			messages = append(messages, message)
-		}
-
-		return fmt.Errorf("configuration validation failed: %s", strings.Join(messages, "; "))
-	}
-
-	return fmt.Errorf("configuration validation failed: %w", err)
-}
-
-// getErrorMessage 获取错误消息
-func (v *configValidator) getErrorMessage(fieldError validator.FieldError) string {
-	field := fieldError.Field()
-	tag := fieldError.Tag()
-	param := fieldError.Param()
-
-	switch tag {
-	case "required":
-		return fmt.Sprintf("field '%s' is required", field)
-	case "min":
-		return fmt.Sprintf("field '%s' must be at least %s", field, param)
-	case "max":
-		return fmt.Sprintf("field '%s' must be at most %s", field, param)
-	case "oneof":
-		return fmt.Sprintf("field '%s' must be one of: %s", field, param)
-	case "duration":
-		return fmt.Sprintf("field '%s' must be a valid duration", field)
-	case "port":
-		return fmt.Sprintf("field '%s' must be a valid address with port", field)
-	case "db_driver":
-		return fmt.Sprintf("field '%s' must be a valid database driver", field)
-	case "log_level":
-		return fmt.Sprintf("field '%s' must be a valid log level", field)
-	default:
-		return fmt.Sprintf("field '%s' failed validation '%s'", field, tag)
-	}
-}
-
-// ConfigValidator 配置验证助手
+// ConfigValidator configuration validator
 type ConfigValidator struct {
-	validator Validator
+	config *conf.Bootstrap
 }
 
-// NewConfigValidator 创建配置验证助手
-func NewConfigValidator() *ConfigValidator {
+// NewConfigValidator creates configuration validator
+func NewConfigValidator(config *conf.Bootstrap) *ConfigValidator {
 	return &ConfigValidator{
-		validator: NewValidator(),
+		config: config,
 	}
 }
 
-// ValidateServerConfig 验证服务器配置
-func (cv *ConfigValidator) ValidateServerConfig(config *Config) error {
-	// 验证HTTP服务器配置
-	if config.Server.HTTP.Addr == "" {
-		return fmt.Errorf("HTTP server address is required")
+// Validate validates configuration
+func (v *ConfigValidator) Validate() error {
+	if err := v.validateServer(); err != nil {
+		return fmt.Errorf("server configuration validation failed: %w", err)
 	}
 
-	if config.Server.HTTP.Timeout <= 0 {
-		config.Server.HTTP.Timeout = 30 * time.Second
+	if err := v.validateData(); err != nil {
+		return fmt.Errorf("data layer configuration validation failed: %w", err)
 	}
 
-	// 验证gRPC服务器配置
-	if config.Server.GRPC.Addr == "" {
-		return fmt.Errorf("gRPC server address is required")
+	if err := v.validateAuth(); err != nil {
+		return fmt.Errorf("authentication configuration validation failed: %w", err)
 	}
 
-	if config.Server.GRPC.Timeout <= 0 {
-		config.Server.GRPC.Timeout = 30 * time.Second
+	if err := v.validateSecurity(); err != nil {
+		return fmt.Errorf("security configuration validation failed: %w", err)
 	}
 
 	return nil
 }
 
-// ValidateDataConfig 验证数据配置
-func (cv *ConfigValidator) ValidateDataConfig(config *Config) error {
-	// 验证数据库配置
-	if config.Data.Database.Driver == "" {
-		return fmt.Errorf("database driver is required")
+// validateServer validates server configuration
+func (v *ConfigValidator) validateServer() error {
+	if v.config.Server == nil {
+		return fmt.Errorf("server configuration cannot be empty")
 	}
 
-	if config.Data.Database.Source == "" {
-		return fmt.Errorf("database source is required")
+	if v.config.Server.Http == nil {
+		return fmt.Errorf("HTTP server configuration cannot be empty")
 	}
 
-	// 验证Redis配置
-	if config.Data.Redis.Addr == "" {
-		return fmt.Errorf("Redis address is required")
+	if v.config.Server.Http.Addr == "" {
+		return fmt.Errorf("HTTP server address cannot be empty")
 	}
 
-	if config.Data.Redis.ReadTimeout <= 0 {
-		config.Data.Redis.ReadTimeout = 3 * time.Second
+	if v.config.Server.Grpc == nil {
+		return fmt.Errorf("gRPC server configuration cannot be empty")
 	}
 
-	if config.Data.Redis.WriteTimeout <= 0 {
-		config.Data.Redis.WriteTimeout = 3 * time.Second
-	}
-
-	return nil
-}
-
-// ValidateAuthConfig 验证认证配置
-func (cv *ConfigValidator) ValidateAuthConfig(config *Config) error {
-	if config.Auth.JWTSecretKey == "" {
-		return fmt.Errorf("JWT secret key is required")
-	}
-
-	if len(config.Auth.JWTSecretKey) < 16 {
-		return fmt.Errorf("JWT secret key must be at least 16 characters")
-	}
-
-	if config.Auth.MaxLoginAttempts <= 0 {
-		config.Auth.MaxLoginAttempts = 5
-	}
-
-	if config.Auth.MaxLoginAttempts > 10 {
-		return fmt.Errorf("max login attempts should not exceed 10")
+	if v.config.Server.Grpc.Addr == "" {
+		return fmt.Errorf("gRPC server address cannot be empty")
 	}
 
 	return nil
 }
 
-// ValidateLogConfig 验证日志配置
-func (cv *ConfigValidator) ValidateLogConfig(config *Config) error {
-	validLevels := []string{"debug", "info", "warn", "error", "fatal"}
-	levelValid := false
-	for _, level := range validLevels {
-		if strings.ToLower(config.Log.Level) == level {
-			levelValid = true
-			break
-		}
+// validateData validates data layer configuration
+func (v *ConfigValidator) validateData() error {
+	if v.config.Data == nil {
+		return fmt.Errorf("data layer configuration cannot be empty")
 	}
 
-	if !levelValid {
-		return fmt.Errorf("invalid log level: %s, must be one of: %s", config.Log.Level, strings.Join(validLevels, ", "))
+	// Validate database configuration
+	if err := v.validateDatabase(); err != nil {
+		return err
 	}
 
-	validFormats := []string{"json", "text"}
-	formatValid := false
-	for _, format := range validFormats {
-		if strings.ToLower(config.Log.Format) == format {
-			formatValid = true
-			break
-		}
-	}
-
-	if !formatValid {
-		return fmt.Errorf("invalid log format: %s, must be one of: %s", config.Log.Format, strings.Join(validFormats, ", "))
+	// Validate Redis configuration
+	if err := v.validateRedis(); err != nil {
+		return err
 	}
 
 	return nil
 }
 
-// ValidateTracingConfig 验证链路追踪配置
-func (cv *ConfigValidator) ValidateTracingConfig(config *Config) error {
-	if config.Tracing.Enabled {
-		if config.Tracing.Jaeger.Endpoint == "" {
-			return fmt.Errorf("Jaeger endpoint is required when tracing is enabled")
+// validateDatabase validates database configuration
+func (v *ConfigValidator) validateDatabase() error {
+	db := v.config.Data.Database
+	if db == nil {
+		return fmt.Errorf("database configuration cannot be empty")
+	}
+
+	if db.Driver == "" {
+		return fmt.Errorf("database driver cannot be empty")
+	}
+
+	if db.Source == "" {
+		return fmt.Errorf("database connection string cannot be empty")
+	}
+
+	// Validate database connection string format
+	if _, err := url.Parse(db.Source); err != nil {
+		return fmt.Errorf("invalid database connection string format: %w", err)
+	}
+
+	// Production environment security checks
+	if isProduction() {
+		if strings.Contains(db.Source, "sslmode=disable") {
+			return fmt.Errorf("production environment must not disable SSL connection")
 		}
 
-		if config.Tracing.Jaeger.SampleRate < 0 || config.Tracing.Jaeger.SampleRate > 1 {
-			return fmt.Errorf("Jaeger sample rate must be between 0 and 1")
+		if strings.Contains(db.Source, "localhost") || strings.Contains(db.Source, "127.0.0.1") {
+			return fmt.Errorf("production environment should not use local database connection")
 		}
 	}
 
 	return nil
 }
 
-// ValidateAll 验证所有配置
-func (cv *ConfigValidator) ValidateAll(config *Config) error {
-	validators := []func(*Config) error{
-		cv.ValidateServerConfig,
-		cv.ValidateDataConfig,
-		cv.ValidateAuthConfig,
-		cv.ValidateLogConfig,
-		cv.ValidateTracingConfig,
+// validateRedis validates Redis configuration
+func (v *ConfigValidator) validateRedis() error {
+	redis := v.config.Data.Redis
+	if redis == nil {
+		return fmt.Errorf("Redis configuration cannot be empty")
 	}
 
-	for _, validate := range validators {
-		if err := validate(config); err != nil {
-			return err
+	if redis.Addr == "" {
+		return fmt.Errorf("Redis address cannot be empty")
+	}
+
+	// Production environment security checks
+	if isProduction() {
+		// Check Redis password via environment variable
+		if os.Getenv("REDIS_PASSWORD") == "" {
+			return fmt.Errorf("production environment Redis must set REDIS_PASSWORD environment variable")
+		}
+
+		if strings.Contains(redis.Addr, "localhost") || strings.Contains(redis.Addr, "127.0.0.1") {
+			return fmt.Errorf("production environment should not use local Redis connection")
 		}
 	}
 
-	return cv.validator.Validate(config)
+	return nil
+}
+
+// validateAuth validates authentication configuration
+func (v *ConfigValidator) validateAuth() error {
+	auth := v.config.Auth
+	if auth == nil {
+		return fmt.Errorf("authentication configuration cannot be empty")
+	}
+
+	if auth.JwtSecretKey == "" {
+		return fmt.Errorf("JWT secret key cannot be empty")
+	}
+
+	// Validate JWT secret key strength
+	if err := v.validateJWTSecret(auth.JwtSecretKey); err != nil {
+		return err
+	}
+
+	if auth.MaxLoginAttempts <= 0 {
+		return fmt.Errorf("maximum login attempts must be greater than 0")
+	}
+
+	return nil
+}
+
+// validateJWTSecret validates JWT secret key strength
+func (v *ConfigValidator) validateJWTSecret(secret string) error {
+	// Minimum length check
+	minLength := 16
+	if isProduction() {
+		minLength = 32
+	}
+
+	if len(secret) < minLength {
+		return fmt.Errorf("JWT secret key length must be at least %d characters (current %d characters)", minLength, len(secret))
+	}
+
+	// Additional checks for production environment
+	if isProduction() {
+		// Check if using default or example keys
+		weakSecrets := []string{
+			"your-super-secret-jwt-key-here",
+			"dev-jwt-secret-key-change-in-production",
+			"secret",
+			"password",
+			"123456",
+		}
+
+		for _, weak := range weakSecrets {
+			if strings.Contains(strings.ToLower(secret), strings.ToLower(weak)) {
+				return fmt.Errorf("production environment cannot use default or weak keys")
+			}
+		}
+
+		// Check key complexity
+		if !isComplexSecret(secret) {
+			return fmt.Errorf("production environment JWT secret key complexity is insufficient, should contain uppercase, lowercase, numbers and special characters")
+		}
+	}
+
+	return nil
+}
+
+// validateSecurity validates security configuration
+func (v *ConfigValidator) validateSecurity() error {
+	// Since Security field may not be defined in proto, skip this validation for now
+	// Can perform security configuration checks via environment variables
+	if isProduction() {
+		// Check TLS configuration
+		if os.Getenv("TLS_ENABLED") == "true" {
+			if os.Getenv("TLS_CERT_FILE") == "" || os.Getenv("TLS_KEY_FILE") == "" {
+				return fmt.Errorf("when TLS is enabled, TLS_CERT_FILE and TLS_KEY_FILE environment variables must be set")
+			}
+
+			// Check if certificate files exist
+			certFile := os.Getenv("TLS_CERT_FILE")
+			keyFile := os.Getenv("TLS_KEY_FILE")
+
+			if _, err := os.Stat(certFile); os.IsNotExist(err) {
+				return fmt.Errorf("TLS certificate file does not exist: %s", certFile)
+			}
+
+			if _, err := os.Stat(keyFile); os.IsNotExist(err) {
+				return fmt.Errorf("TLS key file does not exist: %s", keyFile)
+			}
+		}
+	}
+
+	return nil
+}
+
+// isProduction checks if running in production environment
+func isProduction() bool {
+	env := strings.ToLower(os.Getenv("ENVIRONMENT"))
+	return env == "production" || env == "prod"
+}
+
+// isComplexSecret checks secret complexity
+func isComplexSecret(secret string) bool {
+	hasUpper := false
+	hasLower := false
+	hasDigit := false
+	hasSpecial := false
+
+	for _, char := range secret {
+		switch {
+		case char >= 'A' && char <= 'Z':
+			hasUpper = true
+		case char >= 'a' && char <= 'z':
+			hasLower = true
+		case char >= '0' && char <= '9':
+			hasDigit = true
+		default:
+			hasSpecial = true
+		}
+	}
+
+	// Must contain at least 3 types of characters
+	count := 0
+	if hasUpper {
+		count++
+	}
+	if hasLower {
+		count++
+	}
+	if hasDigit {
+		count++
+	}
+	if hasSpecial {
+		count++
+	}
+
+	return count >= 3
 }

@@ -1,0 +1,97 @@
+# 生产环境配置模板
+# 复制此文件为 config.prod.yaml 并根据实际环境配置相应的值
+# 注意：不要将包含敏感信息的配置文件提交到版本控制系统
+
+server:
+  http:
+    addr: "${HTTP_ADDR:0.0.0.0:8000}"
+    timeout: "${HTTP_TIMEOUT:30s}"
+    # 生产环境建议增加更长的超时时间
+  grpc:
+    addr: "${GRPC_ADDR:0.0.0.0:9000}"
+    timeout: "${GRPC_TIMEOUT:30s}"
+
+data:
+  database:
+    driver: "${DATABASE_DRIVER:postgres}"
+    # 生产环境数据库连接 - 请使用环境变量或密钥管理系统
+    source: "${DATABASE_URL}"
+    # 示例: postgresql://username:password@hostname:5432/database_name?sslmode=require
+    max_idle_conns: "${DB_MAX_IDLE_CONNS:10}"
+    max_open_conns: "${DB_MAX_OPEN_CONNS:100}"
+    conn_max_lifetime: "${DB_CONN_MAX_LIFETIME:1h}"
+  redis:
+    addr: "${REDIS_ADDR}"
+    # 示例: redis-cluster.prod.example.com:6379
+    password: "${REDIS_PASSWORD}"
+    db: "${REDIS_DB:0}"
+    read_timeout: "${REDIS_READ_TIMEOUT:3s}"
+    write_timeout: "${REDIS_WRITE_TIMEOUT:3s}"
+    pool_size: "${REDIS_POOL_SIZE:100}"
+
+auth:
+  # 生产环境JWT密钥 - 必须使用强随机生成的密钥
+  jwt_secret_key: "${JWT_SECRET_KEY}"
+  # 生产环境建议使用较短的令牌有效期
+  access_token_expiration: "${ACCESS_TOKEN_EXPIRATION:1h}"
+  refresh_token_expiration: "${REFRESH_TOKEN_EXPIRATION:7d}"
+  captcha_enabled: "${CAPTCHA_ENABLED:true}"
+  captcha_expiration: "${CAPTCHA_EXPIRATION:5m}"
+  max_login_attempts: "${MAX_LOGIN_ATTEMPTS:5}"
+  lock_duration: "${LOCK_DURATION:30m}"
+  totp_enabled: "${TOTP_ENABLED:true}"
+
+plugins:
+  enabled: "${PLUGINS_ENABLED:true}"
+  directory: "${PLUGINS_DIRECTORY:./plugins}"
+  config_directory: "${PLUGINS_CONFIG_DIRECTORY:./configs/plugins}"
+  auto_load: "${PLUGINS_AUTO_LOAD:false}"
+  security:
+    sandbox_enabled: "${PLUGINS_SANDBOX_ENABLED:true}"
+    max_memory: "${PLUGINS_MAX_MEMORY:50MB}"
+    max_cpu_percent: "${PLUGINS_MAX_CPU_PERCENT:5}"
+
+# 生产环境日志配置
+log:
+  level: "${LOG_LEVEL:info}"
+  format: "${LOG_FORMAT:json}"
+  output: "${LOG_OUTPUT:stdout}"
+  # 日志轮转配置
+  rotation:
+    max_size: "${LOG_MAX_SIZE:100MB}"
+    max_age: "${LOG_MAX_AGE:30d}"
+    max_backups: "${LOG_MAX_BACKUPS:10}"
+
+# 安全配置
+security:
+  # HTTPS配置
+  tls:
+    enabled: "${TLS_ENABLED:true}"
+    cert_file: "${TLS_CERT_FILE}"
+    key_file: "${TLS_KEY_FILE}"
+  # CORS配置
+  cors:
+    allowed_origins: "${CORS_ALLOWED_ORIGINS:}"
+    allowed_methods: "${CORS_ALLOWED_METHODS:GET,POST,PUT,DELETE,OPTIONS}"
+    allowed_headers: "${CORS_ALLOWED_HEADERS:Content-Type,Authorization}"
+    max_age: "${CORS_MAX_AGE:86400}"
+  # 速率限制
+  rate_limit:
+    enabled: "${RATE_LIMIT_ENABLED:true}"
+    requests_per_minute: "${RATE_LIMIT_RPM:100}"
+    burst: "${RATE_LIMIT_BURST:10}"
+
+# 监控配置
+monitoring:
+  metrics:
+    enabled: "${METRICS_ENABLED:true}"
+    addr: "${METRICS_ADDR:0.0.0.0:8080}"
+    path: "${METRICS_PATH:/metrics}"
+  health:
+    enabled: "${HEALTH_ENABLED:true}"
+    addr: "${HEALTH_ADDR:0.0.0.0:8081}"
+    path: "${HEALTH_PATH:/health}"
+  tracing:
+    enabled: "${TRACING_ENABLED:true}"
+    endpoint: "${TRACING_ENDPOINT}"
+    service_name: "${TRACING_SERVICE_NAME:kratos-boilerplate}"
