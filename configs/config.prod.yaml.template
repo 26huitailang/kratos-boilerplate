@@ -81,6 +81,30 @@ security:
     requests_per_minute: "${RATE_LIMIT_RPM:100}"
     burst: "${RATE_LIMIT_BURST:10}"
 
+# 安全配置
+security:
+  # HTTPS配置
+  enable_hsts: "${ENABLE_HSTS:true}"
+  hsts_max_age: "${HSTS_MAX_AGE:31536000}"
+  hsts_include_subdomains: "${HSTS_INCLUDE_SUBDOMAINS:true}"
+  
+  # Content Security Policy
+  content_security_policy: "${CONTENT_SECURITY_POLICY:default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; frame-ancestors 'none';}"
+  
+  # 其他安全头
+  frame_options: "${FRAME_OPTIONS:DENY}"
+  content_type_options: "${CONTENT_TYPE_OPTIONS:true}"
+  xss_protection: "${XSS_PROTECTION:1; mode=block}"
+  referrer_policy: "${REFERRER_POLICY:strict-origin-when-cross-origin}"
+  permissions_policy: "${PERMISSIONS_POLICY:camera=(), microphone=(), geolocation=(), payment=()}"
+  
+  # CORS配置
+  allowed_origins: "${CORS_ALLOWED_ORIGINS:https://yourdomain.com}"
+  allowed_methods: "${CORS_ALLOWED_METHODS:GET,POST,PUT,DELETE,OPTIONS}"
+  allowed_headers: "${CORS_ALLOWED_HEADERS:Content-Type,Authorization,X-Request-ID}"
+  allow_credentials: "${CORS_ALLOW_CREDENTIALS:true}"
+  cors_max_age: "${CORS_MAX_AGE:86400}"
+
 # 监控配置
 monitoring:
   metrics:
