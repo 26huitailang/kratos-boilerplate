@@ -1,0 +1,50 @@
+# 测试配置文件 - 仅用于错误处理中间件测试
+# 不包含数据库配置，专注于HTTP服务器和错误处理功能
+
+server:
+  http:
+    addr: 0.0.0.0:8000
+    timeout: 1s
+  grpc:
+    addr: 0.0.0.0:9000
+    timeout: 1s
+
+# 暂时注释掉数据层配置，避免数据库连接问题
+# data:
+#   database:
+#     driver: postgres
+#     source: postgresql://postgres:postgres@localhost:5432/test_dev?sslmode=disable
+#   redis:
+#     addr: 127.0.0.1:6379
+#     read_timeout: 0.2s
+#     write_timeout: 0.2s
+
+auth:
+  jwt_secret_key: "dev-jwt-secret-key-change-in-production"
+  access_token_expiration: "86400s" # 24h
+  refresh_token_expiration: "604800s" # 7d
+  captcha_enabled: true
+  captcha_expiration: "300s" # 5m
+  max_login_attempts: 5
+  lock_duration: "1800s" # 30m
+  totp_enabled: false
+
+log:
+  level: "info"
+  format: "text"
+  output: "stdout"
+
+plugins:
+  enabled: false
+  directory: "./plugins"
+  config_directory: "./configs/plugins"
+  auto_load: false
+
+# Monitoring configuration
+monitoring:
+  metrics:
+    enabled: true
+    path: "/metrics"
+  health:
+    enabled: true
+    path: "/health"

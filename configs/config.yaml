@@ -22,13 +22,18 @@ data:
 auth:
   # 开发环境JWT密钥 - 仅用于开发环境，生产环境必须使用强随机密钥
   jwt_secret_key: "dev-jwt-secret-key-change-in-production"
-  access_token_expiration: "24h"
-  refresh_token_expiration: "7d"
+  access_token_expiration: "86400s" # 24h
+  refresh_token_expiration: "604800s" # 7d
   captcha_enabled: true
-  captcha_expiration: "5m"
+  captcha_expiration: "300s" # 5m
   max_login_attempts: 5
-  lock_duration: "30m"
+  lock_duration: "1800s" # 30m
   totp_enabled: false
+
+log:
+  level: "info"
+  format: "text"
+  output: "stdout"
 
 plugins:
   enabled: true

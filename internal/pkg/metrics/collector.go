@@ -1,5 +1,4 @@
 package metrics
-package metrics
 
 import (
 	"sync"
@@ -10,12 +9,12 @@ import (
 
 // MetricsCollector collects basic application metrics
 type MetricsCollector struct {
-	mu             sync.RWMutex
-	requestCount   map[string]int64
-	errorCount     map[string]int64
-	responseTime   map[string]time.Duration
-	startTime      time.Time
-	logger         *log.Helper
+	mu           sync.RWMutex
+	requestCount map[string]int64
+	errorCount   map[string]int64
+	responseTime map[string]time.Duration
+	startTime    time.Time
+	logger       *log.Helper
 }
 
 // NewMetricsCollector creates a new metrics collector
@@ -59,15 +58,15 @@ func (m *MetricsCollector) GetMetrics() map[string]interface{} {
 	requests := make(map[string]int64)
 	errors := make(map[string]int64)
 	responses := make(map[string]string)
-	
+
 	for k, v := range m.requestCount {
 		requests[k] = v
 	}
-	
+
 	for k, v := range m.errorCount {
 		errors[k] = v
 	}
-	
+
 	for k, v := range m.responseTime {
 		responses[k] = v.String()
 	}
@@ -85,11 +84,11 @@ func (m *MetricsCollector) GetMetrics() map[string]interface{} {
 func (m *MetricsCollector) Reset() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	m.requestCount = make(map[string]int64)
 	m.errorCount = make(map[string]int64)
 	m.responseTime = make(map[string]time.Duration)
 	m.startTime = time.Now()
-	
+
 	m.logger.Info("Metrics reset")
 }

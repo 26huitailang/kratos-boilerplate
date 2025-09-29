@@ -9,6 +9,7 @@ import (
 	authv1 "kratos-boilerplate/api/auth/v1"
 	v1 "kratos-boilerplate/api/helloworld/v1"
 	"kratos-boilerplate/internal/conf"
+	"kratos-boilerplate/internal/pkg/errors"
 	"kratos-boilerplate/internal/pkg/health"
 	"kratos-boilerplate/internal/pkg/security"
 	"kratos-boilerplate/internal/service"
@@ -23,9 +24,18 @@ func NewHTTPServer(c *conf.Server, greeter *service.GreeterService, auth *servic
 	// Security configuration
 	securityConfig := security.DefaultSecurityConfig()
 
+	// Create error handling middleware
+	errorHandler := errors.NewErrorHandlerMiddleware(logger, true, false)
+	validationErrorHandler := errors.NewValidationErrorMiddleware(logger)
+	rateLimitErrorHandler := errors.NewRateLimitErrorMiddleware(logger)
+
 	var opts = []kratosHttp.ServerOption{
 		kratosHttp.Middleware(
 			recovery.Recovery(),
+			// Add error handling middleware
+			errorHandler.Middleware(),
+			validationErrorHandler.Middleware(),
+			rateLimitErrorHandler.Middleware(),
 			// Security middleware will be added as filters
 			// 暂时注释掉操作日志中间件，等实现了 repo 后再启用
 			// middleware.OperationLogMiddleware(repo),
