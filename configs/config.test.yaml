@@ -1,0 +1,31 @@
+# 测试环境配置 - 用于验证API文档和服务器启动
+server:
+  http:
+    addr: 0.0.0.0:8000
+    timeout: 30s
+  grpc:
+    addr: 0.0.0.0:9000
+    timeout: 30s
+
+data:
+  # 暂时注释掉数据库配置以便测试API文档
+  # database:
+  #   driver: postgres
+  #   source: postgresql://postgres:postgres@localhost:5432/test_db?sslmode=disable
+  # redis:
+  #   addr: 127.0.0.1:6379
+  #   read_timeout: 0.2s
+  #   write_timeout: 0.2s
+
+auth:
+  jwt_secret_key: "test-jwt-secret-key-for-documentation-demo"
+  access_token_expiration: "3600s" # 1 hour in seconds
+  refresh_token_expiration: "604800s" # 7 days in seconds
+  captcha_enabled: true
+  captcha_expiration: "300s" # 5 minutes in seconds
+  max_login_attempts: 5
+  lock_duration: "1800s" # 30 minutes in seconds
+  totp_enabled: false
+
+plugins:
+  enabled: false # 暂时禁用插件避免复杂性

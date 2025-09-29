@@ -1,13 +1,14 @@
 package data
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
-	"time"
 	"kratos-boilerplate/internal/biz"
 	"kratos-boilerplate/internal/conf"
 	"kratos-boilerplate/internal/pkg/captcha"
 	"kratos-boilerplate/internal/pkg/kms"
+	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/wire"
@@ -26,8 +27,10 @@ type Data struct {
 
 // NewData .
 func NewData(c *conf.Data, logger log.Logger) (*Data, func(), error) {
+	// Allow nil configuration for environments without data layer
 	if c == nil {
-		return nil, nil, fmt.Errorf("config is nil")
+		log.NewHelper(logger).Info("Data configuration is nil, skipping data layer initialization")
+		return nil, func() {}, nil
 	}
 	if c.Database == nil {
 		return nil, nil, fmt.Errorf("database config is nil")
@@ -77,18 +80,37 @@ func (d *Data) GetDB() *sql.DB {
 	return d.db
 }
 
+// Ping checks database connectivity
+func (d *Data) Ping(ctx context.Context) error {
+	if d.db == nil {
+		return fmt.Errorf("database connection is nil")
+	}
+	return d.db.PingContext(ctx)
+}
 
+// PingRedis checks Redis connectivity
+func (d *Data) PingRedis(ctx context.Context) error {
+	if d.redis == nil {
+		return fmt.Errorf("redis connection is nil")
+	}
+	return d.redis.Ping(ctx).Err()
+}
+
+// GetRedis gets Redis client
+func (d *Data) GetRedis() *redis.Client {
+	return d.redis
+}
 
 // NewKMSManager 创建KMS管理器
 func NewKMSManager(kmsRepo biz.KMSRepo, logger log.Logger) kms.KMSManager {
 	// 创建默认配置
 	config := &biz.KMSConfig{
-		Seed:             "default-seed-value",
-		Salt:             "default-salt-value",
-		Iterations:       100000,
-		KeyLength:        32,
+		Seed:           "default-seed-value",
+		Salt:           "default-salt-value",
+		Iterations:     100000,
+		KeyLength:      32,
 		RotateInterval: 24 * time.Hour, // 24小时
-		Algorithm:        "AES-256-GCM",
+		Algorithm:      "AES-256-GCM",
 	}
 	return kms.NewKMSManager(kmsRepo, config, logger)
 }

@@ -43,6 +43,7 @@ bin/
 *_grpc.pb.go
 *_http.pb.go
 openapi.yaml
+openapi.json
 swagger.json
 
 # Wire generated files

@@ -90,7 +90,12 @@ func (v *ConfigValidator) validateServer() error {
 // validateData validates data layer configuration
 func (v *ConfigValidator) validateData() error {
 	if v.config.Data == nil {
-		return fmt.Errorf("data layer configuration cannot be empty")
+		// Only require data configuration in production
+		if isProduction() {
+			return fmt.Errorf("data layer configuration cannot be empty in production environment")
+		}
+		// Allow empty data configuration for development/testing
+		return nil
 	}
 
 	// Validate database configuration

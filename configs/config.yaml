@@ -39,3 +39,12 @@ plugins:
     sandbox_enabled: true
     max_memory: "100MB"
     max_cpu_percent: 10
+
+# Monitoring configuration
+monitoring:
+  metrics:
+    enabled: true
+    path: "/metrics"
+  health:
+    enabled: true
+    path: "/health"

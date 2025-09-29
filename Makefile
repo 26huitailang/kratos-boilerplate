@@ -47,6 +47,16 @@ api:
 	@echo "OpenAPI documentation generated in current directory"
 	@ls -la *.yaml 2>/dev/null | grep -E "(openapi|swagger)" || echo "Checking for generated OpenAPI files..."
 
+.PHONY: docs
+# generate API documentation in multiple formats
+docs: api
+	@echo "Generating API documentation..."
+	@python3 -c "import yaml, json; data=yaml.safe_load(open('openapi.yaml')); json.dump(data, open('openapi.json', 'w'), indent=2, ensure_ascii=False)"
+	@echo "API documentation ready:"
+	@echo "  - YAML format: openapi.yaml (import to Postman/Insomnia)"
+	@echo "  - JSON format: openapi.json (for tools requiring JSON)"
+	@echo "  - Swagger UI: http://localhost:8000/q/swagger-ui/ (when server is running)"
+
 .PHONY: build
 # build
 build:
