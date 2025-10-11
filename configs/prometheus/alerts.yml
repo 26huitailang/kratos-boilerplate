@@ -1,0 +1,82 @@
+groups:
+  - name: kratos-boilerplate
+    rules:
+      # 应用可用性告警
+      - alert: ApplicationDown
+        expr: up{job="kratos-boilerplate"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "应用服务不可用"
+          description: "应用 {{ $labels.instance }} 已经停止运行超过1分钟"
+
+      # 高错误率告警
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "HTTP错误率过高"
+          description: "实例 {{ $labels.instance }} 的5xx错误率超过5% (当前值: {{ $value }})"
+
+      # 高响应时间告警
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, instance)) > 1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "HTTP响应时间过长"
+          description: "实例 {{ $labels.instance }} 的95%分位响应时间超过1秒 (当前值: {{ $value }}s)"
+
+      # 高内存使用告警
+      - alert: HighMemoryUsage
+        expr: (go_memstats_alloc_bytes / go_memstats_sys_bytes) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "内存使用率过高"
+          description: "实例 {{ $labels.instance }} 的内存使用率超过80% (当前值: {{ $value }})"
+
+      # 高数据库连接数告警
+      - alert: HighDatabaseConnections
+        expr: pg_connections > 80
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "数据库连接数过高"
+          description: "数据库连接数超过80 (当前值: {{ $value }})"
+
+      # 高CPU使用率告警
+      - alert: HighCPUUsage
+        expr: rate(process_cpu_seconds_total[5m]) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "CPU使用率过高"
+          description: "实例 {{ $labels.instance }} 的CPU使用率超过80% (当前值: {{ $value }})"
+
+      # 低磁盘空间告警
+      - alert: LowDiskSpace
+        expr: node_filesystem_free_bytes / node_filesystem_size_bytes < 0.1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "磁盘空间不足"
+          description: "实例 {{ $labels.instance }} 的磁盘空间剩余不足10% (当前值: {{ $value }})"
+
+      # 高并发请求告警
+      - alert: HighConcurrency
+        expr: rate(http_requests_total[1m]) > 1000
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "请求并发量过高"
+          description: "实例 {{ $labels.instance }} 的请求速率超过1000 req/s (当前值: {{ $value }})"
