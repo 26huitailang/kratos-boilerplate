@@ -18,10 +18,11 @@ import (
 func TestDataInitialization(t *testing.T) {
 	logger := log.NewStdLogger(os.Stdout)
 
-	// 测试nil配置
-	_, _, err := NewData(nil, logger)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "config is nil")
+	// 测试nil配置 - 应该返回nil数据和空清理函数，但不返回错误
+	data, cleanup, err := NewData(nil, logger)
+	assert.NoError(t, err)
+	assert.Nil(t, data)
+	assert.NotNil(t, cleanup)
 
 	// 测试缺少数据库配置
 	config1 := &conf.Data{
@@ -243,16 +244,18 @@ func TestErrorHandling(t *testing.T) {
 	// 测试各种错误情况
 	logger := log.NewStdLogger(os.Stdout)
 
-	// 测试nil配置
-	_, _, err := NewData(nil, logger)
-	assert.Error(t, err)
+	// 测试nil配置 - 不应该返回错误，因为允许nil配置
+	data, cleanup, err := NewData(nil, logger)
+	assert.NoError(t, err)
+	assert.Nil(t, data)
+	assert.NotNil(t, cleanup)
 
-	// 测试空配置
+	// 测试空配置 - 应该返回错误，因为缺少必要字段
 	emptyConfig := &conf.Data{}
 	_, _, err = NewData(emptyConfig, logger)
 	assert.Error(t, err)
 
-	// 测试部分配置
+	// 测试部分配置 - 应该返回错误，因为缺少必要字段
 	partialConfig := &conf.Data{
 		Database: &conf.Data_Database{
 			Driver: "postgres",

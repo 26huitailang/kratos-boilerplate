@@ -2,7 +2,6 @@ package monitoring
 
 import (
 	"context"
-	"fmt"
 	"runtime"
 	"sync"
 	"time"
@@ -18,6 +17,7 @@ type Monitor struct {
 	metrics    *metrics.PrometheusMetrics
 	healthChan chan HealthStatus
 	alertChan  chan Alert
+	ctx        context.Context
 	cancel     context.CancelFunc
 	wg         sync.WaitGroup
 }
@@ -104,6 +104,7 @@ func NewMonitor(config *Config, metrics *metrics.PrometheusMetrics, logger log.L
 		metrics:    metrics,
 		healthChan: make(chan HealthStatus, 10),
 		alertChan:  make(chan Alert, 10),
+		ctx:        ctx,
 		cancel:     cancel,
 	}
 
@@ -142,7 +143,7 @@ func (m *Monitor) run() {
 
 	for {
 		select {
-		case <-m.cancel:
+		case <-m.ctx.Done():
 			return
 		case <-ticker.C:
 			m.checkHealth()
@@ -261,7 +262,7 @@ func (m *Monitor) handleAlerts() {
 
 	for {
 		select {
-		case <-m.cancel:
+		case <-m.ctx.Done():
 			return
 		case alert := <-m.alertChan:
 			m.processAlert(alert)

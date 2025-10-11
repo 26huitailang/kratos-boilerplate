@@ -120,9 +120,11 @@ func TestDataStructure(t *testing.T) {
 func TestConfigValidation(t *testing.T) {
 	logger := log.NewStdLogger(os.Stdout)
 
-	// 测试空配置
-	_, _, err := NewData(nil, logger)
-	assert.Error(t, err)
+	// 测试空配置 - 不应该返回错误，因为允许nil配置
+	data, cleanup, err := NewData(nil, logger)
+	assert.NoError(t, err)
+	assert.Nil(t, data)
+	assert.NotNil(t, cleanup)
 
 	// 测试缺少数据库配置
 	config := &conf.Data{

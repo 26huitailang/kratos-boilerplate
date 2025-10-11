@@ -139,7 +139,7 @@ func TestValidateJWTSecret(t *testing.T) {
 	}{
 		{
 			name:   "valid development secret",
-			secret: "dev-jwt-secret-key",
+			secret: "my-secret-key-long-enough",
 			envVars: map[string]string{
 				"ENVIRONMENT": "development",
 			},
@@ -147,7 +147,7 @@ func TestValidateJWTSecret(t *testing.T) {
 		},
 		{
 			name:   "valid production secret",
-			secret: "Very-Strong-Production-JWT-Secret-Key-With-Numbers-123-And-Symbols!@#",
+			secret: "MyVeryComplexKey123!@#$%LongEnoughAndStrong789",
 			envVars: map[string]string{
 				"ENVIRONMENT": "production",
 			},
@@ -173,11 +173,29 @@ func TestValidateJWTSecret(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// 设置环境变量
+			// 保存原始环境变量
+			originalEnv := make(map[string]string)
+			for key := range tt.envVars {
+				if val, exists := os.LookupEnv(key); exists {
+					originalEnv[key] = val
+				}
+			}
+			
+			// 设置测试环境变量
 			for key, value := range tt.envVars {
 				os.Setenv(key, value)
-				defer os.Unsetenv(key)
 			}
+			
+			// 恢复原始环境变量
+			defer func() {
+				for key := range tt.envVars {
+					if val, exists := originalEnv[key]; exists {
+						os.Setenv(key, val)
+					} else {
+						os.Unsetenv(key)
+					}
+				}
+			}()
 
 			validator := &ConfigValidator{}
 			err := validator.validateJWTSecret(tt.secret)

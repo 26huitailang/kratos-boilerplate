@@ -1,9 +1,7 @@
 package logging
 
 import (
-	"context"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"os"
@@ -239,7 +237,7 @@ func NewElasticsearchHook(hosts []string, index, username, password string) (*El
 func (e *ElasticsearchHook) Send(level log.Level, keyvals ...interface{}) error {
 	// 这里应该实现发送到Elasticsearch的逻辑
 	// 为简化起见，我们只记录一条消息
-	log.Printf("Sending log to Elasticsearch: level=%s, data=%v", level, keyvals)
+	fmt.Printf("Sending log to Elasticsearch: level=%s, data=%v\n", level, keyvals)
 	return nil
 }
 
@@ -253,7 +251,7 @@ type FluentdHook struct {
 	host string
 	port int
 	tag  string
-	conn *net.Conn
+	conn net.Conn
 }
 
 // NewFluentdHook 创建Fluentd钩子
@@ -271,11 +269,14 @@ func NewFluentdHook(host string, port int, tag string) (*FluentdHook, error) {
 func (f *FluentdHook) Send(level log.Level, keyvals ...interface{}) error {
 	// 这里应该实现发送到Fluentd的逻辑
 	// 为简化起见，我们只记录一条消息
-	log.Printf("Sending log to Fluentd: level=%s, data=%v", level, keyvals)
+	fmt.Printf("Sending log to Fluentd: level=%s, data=%v\n", level, keyvals)
 	return nil
 }
 
 // Close 关闭Fluentd钩子
 func (f *FluentdHook) Close() {
 	// 清理资源
+	if f.conn != nil {
+		f.conn.Close()
+	}
 }
